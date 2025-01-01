@@ -48,7 +48,7 @@ function Sidebar() {
                 <li className="h-full"><button onClick={() => setActiveTab("controls")} className={cn("px-3 h-full flex justify-center items-center uppercase", { "bg-[#09090B]": activeTab === "controls" })}>Controls</button></li>
             </ul>
             {activeTab === "console" && <>
-                <div className="bg-[#09090B] h-96 p-3 text-green-500 overflow-y-scroll overflow-x-hidden no-scrollbar truncate">
+                <div className="bg-[#09090B] max-h-96 p-3 text-green-500 overflow-y-scroll overflow-x-hidden no-scrollbar">
                     <p>{"> Establishing ground control link..."}</p>
                     <p>{"> Establishing ground control link..."}</p>
                     <p>{"> Establishing ground control link..."}</p>
