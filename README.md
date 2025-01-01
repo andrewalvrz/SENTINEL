@@ -23,3 +23,4 @@ Details on the licensing and permissions for this project.
 ## Authors
 
 - [@andrewalvrz](https://github.com/andrewalvrz)
+- [Ramon G.](https://github.com/RamonGarciaJr956)

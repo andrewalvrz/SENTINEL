@@ -1,49 +1,47 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
+import StatusBar from "./components/StatusBar";
+import Sidebar from "./components/Sidebar";
+import 'leaflet/dist/leaflet.css'
+import FlightTrajectory from "./components/FlightTrajectory";
+import Graphs from "./components/Graphs";
+import Orientation from "./components/Orientation";
+import Map from "./components/Map";
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
 
   async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
     setGreetMsg(await invoke("greet", { name }));
   }
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <main id="main" className="w-screen h-screen bg-black flex flex-col">
+      <StatusBar />
 
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+      <div className="flex flex-row h-full font-mono overflow-hidden">
+        <div className="flex-1 flex flex-col p-2 gap-2">
+          <div className="flex flex-row gap-2 w-full h-[55%] min-h-0">
+
+            <Map />
+
+            <Orientation />
+
+          </div>
+
+          <div className="flex flex-row gap-2 w-full flex-1 min-h-0">
+
+            <FlightTrajectory />
+
+            <Graphs />
+
+          </div>
+        </div>
+
+        <Sidebar />
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
     </main>
   );
 }
