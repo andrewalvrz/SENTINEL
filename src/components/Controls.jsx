@@ -1,8 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useTelemetry } from '../context/TelemetryContext';
 
-export const useMockDataFlow = () => {
-    const { updateTelemetryData, setIsRunning } = useTelemetry();
+export const useMockDataFlow = (updateTelemetryData, setIsRunning) => {
 
     const initializeLaunchSequence = async () => {
         try {

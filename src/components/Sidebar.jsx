@@ -4,15 +4,13 @@ import { motion, useMotionValue } from "framer-motion";
 import Logo from "../assets/Logo.png";
 import { useState, useCallback } from "react";
 import { useMockDataFlow } from './Controls';
-import { useTelemetry } from '../context/TelemetryContext';
 
-function Sidebar() {
+function Sidebar({ isRunning, latestPacket, updateTelemetryData, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
     const mWidth = useMotionValue(window.innerWidth / 4.75);
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
-    const { initializeLaunchSequence, systemCheck } = useMockDataFlow();
-    const { isRunning, latestPacket } = useTelemetry();
+    const { initializeLaunchSequence, systemCheck } = useMockDataFlow(updateTelemetryData, setIsRunning);
 
     useEffect(() => {
         if (!initialized.current) {

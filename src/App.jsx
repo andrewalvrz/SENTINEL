@@ -7,11 +7,35 @@ import FlightTrajectory from "./components/FlightTrajectory";
 import Graphs from "./components/Graphs";
 import Orientation from "./components/Orientation";
 import Map from "./components/Map";
-import { TelemetryProvider } from './context/TelemetryContext';
-import { useTelemetry } from './context/TelemetryContext';
+import { useState } from 'react';
 
 function AppContent() {
-  const { latestPacket, packets, packetReceived, setPacketReceived } = useTelemetry();
+  const [latestPacket, setLatestPacket] = useState({});
+  const [packets, setPackets] = useState([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [packetReceived, setPacketReceived] = useState(false);
+
+  const updateTelemetryData = (allPackets) => {
+    setPackets([allPackets[0]]);
+    setLatestPacket(allPackets[0]);
+
+    let index = 0;
+    const intervalId = setInterval(() => {
+      if (index >= allPackets.length - 1) {
+        clearInterval(intervalId);
+        setIsRunning(false);
+        return;
+      }
+      index++;
+      setCurrentIndex(index);
+      setPacketReceived(true);
+      setPackets(allPackets.slice(0, index + 1));
+      setLatestPacket(allPackets[index]);
+    }, 250);
+
+    return () => clearInterval(intervalId);
+  };
 
   return (
     <main id="main" className="w-screen h-screen bg-black flex flex-col">
@@ -84,17 +108,21 @@ function AppContent() {
 
           </div>
         </div>
-        <Sidebar />
+        <Sidebar 
+          isRunning={isRunning} 
+          latestPacket={latestPacket}
+          updateTelemetryData={updateTelemetryData}
+          setIsRunning={setIsRunning}
+        />
       </div>
     </main>
   );
 }
 
+//Handles the telemetry data, makes it available to the rest of the app
 function App() {
   return (
-    <TelemetryProvider>
-      <AppContent />
-    </TelemetryProvider>
+    <AppContent />
   );
 }
 
