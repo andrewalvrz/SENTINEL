@@ -64,8 +64,14 @@ function Sidebar() {
             }
 
             {activeTab === "controls" &&
-                <>
-                </>
+                <div className="flex flex-col gap-2 p-4">
+                    <button className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4">
+                        Initialize Launch Sequence
+                    </button>
+                    <button className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4">
+                        System Check
+                    </button>
+                </div>
             }
 
             <div className='flex flex-col px-4 py-2 text-[#9CA3AF] gap-1'>
