@@ -9,7 +9,7 @@ import Orientation from "./components/Orientation";
 import Map from "./components/Map";
 import { useState } from 'react';
 
-function AppContent() {
+function App() {
   const [latestPacket, setLatestPacket] = useState({});
   const [packets, setPackets] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -119,11 +119,5 @@ function AppContent() {
   );
 }
 
-//Handles the telemetry data, makes it available to the rest of the app
-function App() {
-  return (
-    <AppContent />
-  );
-}
 
 export default App;
