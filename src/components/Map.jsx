@@ -36,18 +36,18 @@ const MapInvalidator = forwardRef((props, ref) => {
     return null;
 });
 
-function Map() {
+function Map({ markers }) {
     const mapRef = useRef(null);
     const [zoomLevel, setZoomLevel] = useState(13);
     const [position, setPosition] = useState([32.9901482, -106.9750699, 947]);
     const [swaping, setSwaping] = useState(false);
     const [hasChanged, setHasChanged] = useState(false);
 
-    const markers = [
+    /*const markers = [
         { id: 1, position: [32.9901482, -106.9750699, 947], popup: "Marker 1" },
         { id: 2, position: [33.0901482, -107.9750699, 947], popup: "Marker 2" },
         { id: 3, position: [31.9901482, -105.9750699, 947], popup: "Marker 3" },
-    ];
+    ];*/
 
     useEffect(() => {
         const container = document.getElementById('main')
@@ -119,17 +119,13 @@ function Map() {
                             attributionControl={false} 
                         >
                             <MapInvalidator ref={mapRef} setZoomLevel={setZoomLevel} setPosition={setPosition} />
-                            {/*<TileLayer
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            />*/}
                             <TileLayer
                                 attribution='&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
                                 url='https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
                             />
                             {markers.map((marker) => (
                                 <Marker key={marker.id} position={marker.position}>
-                                    <Popup>{marker.popup}</Popup>
+                                    <Popup>{marker.id}</Popup>
                                 </Marker>
                             ))}
                         </MapContainer>

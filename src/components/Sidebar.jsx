@@ -77,10 +77,6 @@ function Sidebar() {
                     <p>0.00 m (&Delta;: 0.10 m)</p>
                 </div>
                 <div className='flex flex-row justify-between'>
-                    <p>RSSI</p>
-                    <p>-88.00 dBm</p>
-                </div>
-                <div className='flex flex-row justify-between'>
                     <p>SNR</p>
                     <p>9.50 dBm</p>
                 </div>

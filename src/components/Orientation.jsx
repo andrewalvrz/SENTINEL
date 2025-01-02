@@ -23,22 +23,21 @@ const CanvasResizer = () => {
     return null;
 };
 
-const RocketModel = () => {
+const RocketModel = ({ rotation }) => {
     const gltf = useGLTF("/Rocket.gltf");
     const modelRef = useRef();
+    const groupRef = useRef();
+    const [isInitialized, setIsInitialized] = useState(false);
 
     useEffect(() => {
-        if (gltf.scene) {
+        if (gltf.scene && !isInitialized) {
             const boundingBox = new THREE.Box3().setFromObject(gltf.scene);
             const center = boundingBox.getCenter(new THREE.Vector3());
-
             gltf.scene.position.sub(center);
 
-            gltf.scene.rotation.set(0, 0, 0);
-            gltf.scene.rotateX(-Math.PI / 2);
+            gltf.scene.rotation.set(-Math.PI / 2, 0, 0);
 
             const newColor = new THREE.Color("#9CA3AF");
-
             gltf.scene.traverse((child) => {
                 if (child.isMesh) {
                     if (Array.isArray(child.material)) {
@@ -54,13 +53,33 @@ const RocketModel = () => {
                     }
                 }
             });
-        }
-    }, [gltf]);
 
-    return <primitive ref={modelRef} object={gltf.scene} />;
+            setIsInitialized(true);
+        }
+    }, [gltf, isInitialized]);
+
+    useEffect(() => {
+        if (groupRef.current && isInitialized) {            
+            const yawRad = THREE.MathUtils.degToRad(rotation.yaw);
+            const pitchRad = THREE.MathUtils.degToRad(rotation.pitch);
+            const rollRad = THREE.MathUtils.degToRad(rotation.roll);
+
+            const quaternion = new THREE.Quaternion();
+            const euler = new THREE.Euler(pitchRad, yawRad, rollRad, 'YXZ');
+            quaternion.setFromEuler(euler);
+
+            groupRef.current.setRotationFromQuaternion(quaternion);
+        }
+    }, [rotation, isInitialized]);
+
+    return (
+        <group ref={groupRef}>
+            <primitive ref={modelRef} object={gltf.scene} />
+        </group>
+    );
 };
 
-function Orientation() {
+function Orientation({ rotation }) {
     const containerRef = useRef();
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -106,19 +125,19 @@ function Orientation() {
                                 left: 0,
                                 top: 0
                             }}
-                            camera={{ 
+                            camera={{
                                 position: [4, 0, 0],
                                 fov: 50,
                                 near: 0.1,
                                 far: 1000,
                                 up: [0, 1, 0]
-                              }}
+                            }}
                         >
                             <axesHelper args={[1]} />
                             <CanvasResizer />
                             <ambientLight intensity={0.5} />
                             <pointLight position={[10, 10, 10]} />
-                            <RocketModel />
+                            <RocketModel rotation={rotation} />
                             <OrbitControls
                                 enableZoom={true}
                                 enableRotate={true}

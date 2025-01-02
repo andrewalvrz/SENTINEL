@@ -58,19 +58,54 @@ const PulsingSphereMaterial = {
     `
 };
 
-const RocketPath = () => {
-    const points = useMemo(() => {
-        const pts = [];
-        for (let i = 0; i <= 100; i++) {
-            const t = i / 100;
-            pts.push([
-                Math.cos(t * Math.PI * 2) * (1 - t) * 2,
-                t * 10,
-                Math.sin(t * Math.PI * 2) * (1 - t) * 2
-            ]);
+
+const SCALE_FACTOR = 0.0025; // Adjust this value to change the overall scale of the visualization
+
+const calculateRelativePoints = (points) => {
+    if (!points || points.length === 0) return [];
+
+    // Use the first point as the reference/origin
+    const origin = points[0];
+
+    return points.map(point => ({
+        ...point,
+        relativePosition: [
+            // add back scale factor to make rocket seem to just go stright up and back down (Add scale of 5 to make the distance between the launch sight and landing more pronounced)
+            (point.position[0] - origin.position[0]) * 5,
+            point.altitude ? (point.altitude - origin.altitude) * SCALE_FACTOR : 0,
+            (point.position[1] - origin.position[1]) * 5
+        ]
+    }));
+};
+
+const RocketPath = ({ points, packetRecieved, setPacketRecieved }) => {
+    const pathPoints = useMemo(() => {
+        const relativePoints = calculateRelativePoints(points);
+        return relativePoints.map(point => point.relativePosition);
+    }, [points]);
+
+    const interpolatedPoints = useMemo(() => {
+        if (pathPoints.length < 2) return pathPoints;
+
+        const result = [];
+        const segments = 10; // Number of segments between each pair of points
+
+        for (let i = 0; i < pathPoints.length - 1; i++) {
+            const start = pathPoints[i];
+            const end = pathPoints[i + 1];
+
+            for (let j = 0; j <= segments; j++) {
+                const t = j / segments;
+                result.push([
+                    start[0] + (end[0] - start[0]) * t,
+                    start[1] + (end[1] - start[1]) * t,
+                    start[2] + (end[2] - start[2]) * t
+                ]);
+            }
         }
-        return pts;
-    }, []);
+
+        return result;
+    }, [pathPoints]);
 
     const rocketRef = useRef();
     const materialRef = useRef();
@@ -80,46 +115,52 @@ const RocketPath = () => {
             materialRef.current.uniforms.triggerTime.value = materialRef.current.uniforms.time.value;
             materialRef.current.uniforms.triggerStrength.value = 1.0;
         }
-    }, []);
+        setPacketRecieved(false);
+    }, [setPacketRecieved]);
+
+    useEffect(() => {
+        if (rocketRef.current && interpolatedPoints.length > 0) {
+            const latestPoint = interpolatedPoints[interpolatedPoints.length - 1];
+            const previousPoint = interpolatedPoints[interpolatedPoints.length - 2] || interpolatedPoints[interpolatedPoints.length - 1];
+
+            rocketRef.current.position.set(
+                latestPoint[0],
+                latestPoint[1],
+                latestPoint[2]
+            );
+
+            const dir = new THREE.Vector3()
+                .fromArray(latestPoint)
+                .sub(new THREE.Vector3().fromArray(previousPoint))
+                .normalize();
+            rocketRef.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+        }
+    }, [interpolatedPoints]);
 
     useFrame(({ clock }) => {
-        if (rocketRef.current) {
-            const t = (clock.getElapsedTime() % 5) / 5;
-            const index = Math.floor(t * (points.length - 1));
-            const nextIndex = Math.min(index + 1, points.length - 1);
-
-            const alpha = t * (points.length - 1) - index;
-            rocketRef.current.position.x = points[index][0] * (1 - alpha) + points[nextIndex][0] * alpha;
-            rocketRef.current.position.y = points[index][1] * (1 - alpha) + points[nextIndex][1] * alpha;
-            rocketRef.current.position.z = points[index][2] * (1 - alpha) + points[nextIndex][2] * alpha;
-
-            const dir = new THREE.Vector3().fromArray(points[nextIndex]).sub(rocketRef.current.position).normalize();
-            rocketRef.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-
-            if (materialRef.current) {
-                materialRef.current.uniforms.time.value = clock.getElapsedTime();
-
-                if (materialRef.current.uniforms.triggerStrength.value > 0) {
-                    materialRef.current.uniforms.triggerStrength.value *= 0.95;
-                }
+        if (materialRef.current) {
+            materialRef.current.uniforms.time.value = clock.getElapsedTime();
+            if (materialRef.current.uniforms.triggerStrength.value > 0) {
+                materialRef.current.uniforms.triggerStrength.value *= 0.95;
             }
         }
     });
 
-    // Example: Trigger pulse every 2 seconds (remove this in production)
-    useFrame(({ clock }) => {
-        if (clock.getElapsedTime() % 0.5 < 0.016) { // 0.016 is roughly one frame at 60fps
+    useEffect(() => {
+        if (packetRecieved) {
             triggerPulse();
         }
-    });
+    }, [packetRecieved, triggerPulse]);
 
     return (
         <group>
-            <DreiLine
-                points={points}
-                color="white"
-                lineWidth={2}
-            />
+            {interpolatedPoints.length > 1 && (
+                <DreiLine
+                    points={interpolatedPoints}
+                    color="white"
+                    lineWidth={2}
+                />
+            )}
             <mesh ref={rocketRef}>
                 <sphereGeometry args={[0.2]} />
                 <shaderMaterial
@@ -144,7 +185,7 @@ const CanvasResizer = () => {
     return null;
 };
 
-function FlightTrajectory() {
+function FlightTrajectory({ points, packetRecieved, setPacketRecieved }) {
     const containerRef = useRef();
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -199,7 +240,7 @@ function FlightTrajectory() {
                             <ambientLight intensity={0.5} />
                             <pointLight position={[10, 10, 10]} />
                             <gridHelper args={[10, 10]} />
-                            <RocketPath />
+                            <RocketPath points={points} packetRecieved={packetRecieved} setPacketRecieved={setPacketRecieved} />
                             <OrbitControls
                                 enablePan={true}
                                 enableZoom={true}
