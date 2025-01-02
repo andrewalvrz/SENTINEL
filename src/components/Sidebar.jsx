@@ -30,7 +30,9 @@ function Sidebar() {
         } else {
             mWidth.set(window.innerWidth / 4.75);
         }
+    }, []);
 
+    useEffect(() => {
         window.addEventListener("resize", updateWidthAndHeight);
         return () => window.removeEventListener("resize", updateWidthAndHeight);
     }, []);
@@ -74,8 +76,8 @@ function Sidebar() {
                 </div>
             }
 
-            <div className='flex flex-col px-4 py-2 text-[#9CA3AF] gap-1'>
-                <h2 className='uppercase text-lg'>Live Data</h2>
+            <div className='flex flex-col px-4 py-2 text-white gap-1'>
+                <h2 className='uppercase text-lg text-[#9CA3AF]'>Live Data</h2>
                 <div className='flex flex-row justify-between'>
                     <p>Altitude</p>
                     <p>0.00 m (&Delta;: 0.10 m)</p>
