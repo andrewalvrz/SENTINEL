@@ -11,6 +11,9 @@ SENTINEL is a cutting-edge system designed to collect and transmit environmental
 ## Installation
 Instructions on setting up and configuring the SENTINEL system.
 
+- run: pnpm install
+- next, run: npm run tauri dev
+
 ## Usage
 How to use the SENTINEL system for telemetry data collection during rocket flights.
 
@@ -24,3 +27,4 @@ Details on the licensing and permissions for this project.
 
 - [@andrewalvrz](https://github.com/andrewalvrz)
 - [Ramon G.](https://github.com/RamonGarciaJr956)
+- [Luis M.](https://github.com/Lmx154)

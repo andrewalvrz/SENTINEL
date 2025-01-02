@@ -3,12 +3,16 @@ import { cn } from "../../src/utils";
 import { motion, useMotionValue } from "framer-motion";
 import Logo from "../assets/Logo.png";
 import { useState, useCallback } from "react";
+import { useMockDataFlow } from './Controls';
+import { useTelemetry } from '../context/TelemetryContext';
 
 function Sidebar() {
     const [activeTab, setActiveTab] = useState("console");
     const mWidth = useMotionValue(window.innerWidth / 4.75);
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
+    const { initializeLaunchSequence, systemCheck } = useMockDataFlow();
+    const { isRunning, latestPacket } = useTelemetry();
 
     useEffect(() => {
         if (!initialized.current) {
@@ -36,6 +40,30 @@ function Sidebar() {
         window.addEventListener("resize", updateWidthAndHeight);
         return () => window.removeEventListener("resize", updateWidthAndHeight);
     }, []);
+
+    const handleLaunchSequence = async () => {
+        if (isRunning) {
+            setConsoleArray(prev => [...prev, "Simulation already running..."]);
+            return;
+        }
+        setConsoleArray(prev => [...prev, "Initializing launch sequence..."]);
+        const data = await initializeLaunchSequence();
+        if (data.length > 0) {
+            setConsoleArray(prev => [...prev, "Launch sequence initialized successfully"]);
+        } else {
+            setConsoleArray(prev => [...prev, "Launch sequence initialization failed"]);
+        }
+    };
+
+    const handleSystemCheck = async () => {
+        setConsoleArray(prev => [...prev, "Running system check..."]);
+        const success = await systemCheck();
+        if (success) {
+            setConsoleArray(prev => [...prev, "System check completed successfully"]);
+        } else {
+            setConsoleArray(prev => [...prev, "System check failed"]);
+        }
+    };
 
     return (
         <motion.div
@@ -67,10 +95,16 @@ function Sidebar() {
 
             {activeTab === "controls" &&
                 <div className="flex flex-col gap-2 p-4">
-                    <button className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4">
+                    <button 
+                        onClick={handleLaunchSequence}
+                        className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
+                    >
                         Initialize Launch Sequence
                     </button>
-                    <button className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4">
+                    <button 
+                        onClick={handleSystemCheck}
+                        className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
+                    >
                         System Check
                     </button>
                 </div>
@@ -80,7 +114,7 @@ function Sidebar() {
                 <h2 className='uppercase text-lg text-[#9CA3AF]'>Live Data</h2>
                 <div className='flex flex-row justify-between'>
                     <p>Altitude</p>
-                    <p>0.00 m (&Delta;: 0.10 m)</p>
+                    <p>{latestPacket.altitude?.toFixed(2) || "0.00"} m</p>
                 </div>
                 <div className='flex flex-row justify-between'>
                     <p>SNR</p>
