@@ -20,7 +20,7 @@ function StatusBar() {
 
             <div className="flex flex-col items-center font-mono">
                 <p className="text-[#9CA3AF]">Status</p>
-                <p className="text-red-600">DISCONNECTED</p>
+                <p className="text-red-600 font-semibold">DISCONNECTED</p>
             </div>
 
             <div className="flex flex-col items-center font-mono">

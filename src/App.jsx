@@ -16,7 +16,7 @@ function App() {
   async function greet() {
     setGreetMsg(await invoke("greet", { name }));
   }
-
+  
   return (
     <main id="main" className="w-screen h-screen bg-black flex flex-col">
       <StatusBar />

@@ -1,7 +1,62 @@
 import React from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Line as DreiLine } from '@react-three/drei';
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import * as THREE from 'three';
+
+const PulsingSphereMaterial = {
+    uniforms: {
+        color: { value: new THREE.Color('#a3e635') },
+        time: { value: 0 },
+        pulseColor: { value: new THREE.Color('#ffffff') },
+        triggerTime: { value: -1000.0 },
+        triggerStrength: { value: 0.0 }
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vPosition = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 color;
+      uniform vec3 pulseColor;
+      uniform float time;
+      uniform float triggerTime;
+      uniform float triggerStrength;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      
+      void main() {
+        // Triggered pulse with enhanced effect
+        float timeSinceTrigger = time - triggerTime;
+        float triggerPulse = exp(-timeSinceTrigger * 2.5) * triggerStrength;
+        
+        // Enhanced fresnel effect
+        float fresnel = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 3.0);
+        
+        // Create inner glow based on distance from center
+        float radius = length(vPosition);
+        float innerGlow = smoothstep(0.0, 0.2, radius);
+        
+        // Combine effects
+        float pulseStrength = max(fresnel, innerGlow) * triggerPulse;
+        float finalPulse = pulseStrength * (1.0 + triggerPulse);
+        
+        // Enhanced color mixing
+        vec3 glowColor = mix(color, pulseColor, triggerPulse);
+        vec3 finalColor = mix(color, glowColor, finalPulse);
+        
+        // Add extra brightness during pulse peaks
+        finalColor += pulseColor * triggerPulse * 0.4;
+        
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `
+};
 
 const RocketPath = () => {
     const points = useMemo(() => {
@@ -18,6 +73,15 @@ const RocketPath = () => {
     }, []);
 
     const rocketRef = useRef();
+    const materialRef = useRef();
+
+    const triggerPulse = useCallback(() => {
+        if (materialRef.current) {
+            materialRef.current.uniforms.triggerTime.value = materialRef.current.uniforms.time.value;
+            materialRef.current.uniforms.triggerStrength.value = 1.0;
+        }
+    }, []);
+
     useFrame(({ clock }) => {
         if (rocketRef.current) {
             const t = (clock.getElapsedTime() % 5) / 5;
@@ -28,6 +92,24 @@ const RocketPath = () => {
             rocketRef.current.position.x = points[index][0] * (1 - alpha) + points[nextIndex][0] * alpha;
             rocketRef.current.position.y = points[index][1] * (1 - alpha) + points[nextIndex][1] * alpha;
             rocketRef.current.position.z = points[index][2] * (1 - alpha) + points[nextIndex][2] * alpha;
+
+            const dir = new THREE.Vector3().fromArray(points[nextIndex]).sub(rocketRef.current.position).normalize();
+            rocketRef.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+
+            if (materialRef.current) {
+                materialRef.current.uniforms.time.value = clock.getElapsedTime();
+
+                if (materialRef.current.uniforms.triggerStrength.value > 0) {
+                    materialRef.current.uniforms.triggerStrength.value *= 0.95;
+                }
+            }
+        }
+    });
+
+    // Example: Trigger pulse every 2 seconds (remove this in production)
+    useFrame(({ clock }) => {
+        if (clock.getElapsedTime() % 0.5 < 0.016) { // 0.016 is roughly one frame at 60fps
+            triggerPulse();
         }
     });
 
@@ -39,8 +121,12 @@ const RocketPath = () => {
                 lineWidth={2}
             />
             <mesh ref={rocketRef}>
-                <coneGeometry args={[0.2, 0.6, 32]} />
-                <meshStandardMaterial color="red" />
+                <sphereGeometry args={[0.2]} />
+                <shaderMaterial
+                    ref={materialRef}
+                    args={[PulsingSphereMaterial]}
+                    attach="material"
+                />
             </mesh>
         </group>
     );
@@ -107,7 +193,7 @@ function FlightTrajectory() {
                                 left: 0,
                                 top: 0
                             }}
-                            camera={{ position: [0, 10, 5], fov: 75 }}
+                            camera={{ position: [5, 8, 5], fov: 75 }}
                         >
                             <CanvasResizer />
                             <ambientLight intensity={0.5} />
