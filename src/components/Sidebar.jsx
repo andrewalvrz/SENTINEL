@@ -30,7 +30,9 @@ function Sidebar() {
         } else {
             mWidth.set(window.innerWidth / 4.75);
         }
+    }, []);
 
+    useEffect(() => {
         window.addEventListener("resize", updateWidthAndHeight);
         return () => window.removeEventListener("resize", updateWidthAndHeight);
     }, []);
