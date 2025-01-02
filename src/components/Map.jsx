@@ -116,6 +116,7 @@ function Map() {
                             scrollWheelZoom={true}
                             className="w-full h-full"
                             key={hasChanged}
+                            attributionControl={false} 
                         >
                             <MapInvalidator ref={mapRef} setZoomLevel={setZoomLevel} setPosition={setPosition} />
                             {/*<TileLayer
