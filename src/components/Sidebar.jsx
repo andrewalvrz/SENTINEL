@@ -7,7 +7,7 @@ import { useMockDataFlow } from './Controls';
 
 function Sidebar({ isRunning, latestPacket, updateTelemetryData, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
-    const mWidth = useMotionValue(window.innerWidth / 4.75);
+    const mWidth = useMotionValue(window.innerWidth / 4.5);
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
     const { initializeLaunchSequence, systemCheck } = useMockDataFlow(updateTelemetryData, setIsRunning);
@@ -32,22 +32,20 @@ function Sidebar({ isRunning, latestPacket, updateTelemetryData, setIsRunning })
     useEffect(() => {
         if (!initialized.current) {
             setConsoleArray(prev => [...prev, `Initializing system...`]);
-            setConsoleArray(prev => [...prev, `Initializing system 1...`]);
-            setConsoleArray(prev => [...prev, `Initializing system 2...`]);
             initialized.current = true;
         }
     }, []);
 
     function updateWidthAndHeight() {
-        mWidth.set(window.innerWidth / 4.75);
+        mWidth.set(window.innerWidth / 4.5);
     }
 
     const handleDrag = useCallback((event, info) => {
         const newWidth = mWidth.get() - info.delta.x;
-        if (newWidth >= (window.innerWidth / 4.75)) {
+        if (newWidth >= (window.innerWidth / 4.5)) {
             mWidth.set(newWidth);
         } else {
-            mWidth.set(window.innerWidth / 4.75);
+            mWidth.set(window.innerWidth / 4.5);
         }
     }, []);
 
@@ -95,7 +93,7 @@ function Sidebar({ isRunning, latestPacket, updateTelemetryData, setIsRunning })
                 dragConstraints={{ top: 0, left: 0, right: 0, bottom: 0 }}
                 onDrag={handleDrag}
                 onDoubleClick={() => {
-                    mWidth.set(window.innerWidth / 4.75);
+                    mWidth.set(window.innerWidth / 4.5);
                 }}
             />
 
