@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { cn } from "../../src/utils";
-import { motion, useMotionValue } from "framer-motion";
+import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
 import { useState, useCallback } from "react";
 import { useMockDataFlow } from './Controls';
@@ -12,6 +12,23 @@ function Sidebar({ isRunning, latestPacket, updateTelemetryData, setIsRunning })
     const initialized = useRef(false);
     const { initializeLaunchSequence, systemCheck } = useMockDataFlow(updateTelemetryData, setIsRunning);
 
+    // Animation variants
+    const tabContentVariants = {
+        enter: {
+            x: 20,
+            opacity: 0
+        },
+        center: {
+            x: 0,
+            opacity: 1
+        },
+        exit: {
+            x: -20,
+            opacity: 0
+        }
+    };
+
+    // Rest of your existing useEffects and handlers...
     useEffect(() => {
         if (!initialized.current) {
             setConsoleArray(prev => [...prev, `Initializing system...`]);
@@ -82,33 +99,87 @@ function Sidebar({ isRunning, latestPacket, updateTelemetryData, setIsRunning })
                 }}
             />
 
-            <ul className="w-full h-10 border-b-2 border-[#18181B] flex flex-row items-center text-[#9CA3AF]">
-                <li className="h-full"><button onClick={() => setActiveTab("console")} className={cn("px-3 h-full flex justify-center items-center uppercase", { "bg-[#09090B]": activeTab === "console" })}>Console</button></li>
-                <li className="h-full"><button onClick={() => setActiveTab("controls")} className={cn("px-3 h-full flex justify-center items-center uppercase", { "bg-[#09090B]": activeTab === "controls" })}>Controls</button></li>
+            <ul className="w-full h-10 border-b-2 border-[#18181B] flex flex-row items-center text-[#9CA3AF] relative">
+                {["console", "controls"].map((tab) => (
+                    <li key={tab} className="h-full">
+                        <button
+                            onClick={() => setActiveTab(tab)}
+                            className={cn("px-3 h-full flex justify-center items-center uppercase relative", {
+                                "text-white": activeTab === tab
+                            })}
+                        >
+                            <p className='z-10'>{tab}</p>
+                            {activeTab === tab && (
+                                <motion.div
+                                    className="absolute bottom-0 left-0 right-0 h-full bg-[#09090B]"
+                                    layoutId="activeTab"
+                                    initial={false}
+                                    transition={{
+                                        type: "spring",
+                                        stiffness: 500,
+                                        damping: 35
+                                    }}
+                                />
+                            )}
+                        </button>
+                    </li>
+                ))}
             </ul>
 
-            {activeTab === "console" &&
-                <textarea readOnly value={consoleArray.map((line) => "> " + line).join("\n")} className="bg-[#09090B] h-96 max-h-96 p-3 text-green-500 overflow-y-scroll overflow-x-hidden no-scrollbar focus:outline-none" />
-            }
+            <div className="relative flex-1 overflow-hidden">
+                <AnimatePresence mode="wait">
+                    {activeTab === "console" && (
+                        <motion.div
+                            key="console"
+                            variants={tabContentVariants}
+                            initial="enter"
+                            animate="center"
+                            exit="exit"
+                            transition={{
+                                duration: 0.2
+                            }}
+                            className="absolute inset-0"
+                        >
+                            <textarea 
+                                readOnly 
+                                value={consoleArray.map((line) => "> " + line).join("\n")} 
+                                className="bg-[#09090B] resize-none max-h-full h-full p-3 text-green-500 overflow-y-scroll overflow-x-hidden no-scrollbar focus:outline-none w-full" 
+                            />
+                        </motion.div>
+                    )}
 
-            {activeTab === "controls" &&
-                <div className="flex flex-col gap-2 p-4">
-                    <button 
-                        onClick={handleLaunchSequence}
-                        className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
-                    >
-                        Initialize Launch Sequence
-                    </button>
-                    <button 
-                        onClick={handleSystemCheck}
-                        className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
-                    >
-                        System Check
-                    </button>
-                </div>
-            }
+                    {activeTab === "controls" && (
+                        <motion.div
+                            key="controls"
+                            variants={tabContentVariants}
+                            initial="enter"
+                            animate="center"
+                            exit="exit"
+                            transition={{
+                                duration: 0.2
+                            }}
+                            className="absolute inset-0"
+                        >
+                            <div className="flex flex-col gap-2 p-4">
+                                <button 
+                                    onClick={handleLaunchSequence}
+                                    className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
+                                >
+                                    Initialize Launch Sequence
+                                </button>
+                                <button 
+                                    onClick={handleSystemCheck}
+                                    className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
+                                >
+                                    System Check
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
 
-            <div className='flex flex-col px-4 py-2 text-white gap-1'>
+            <div className='flex flex-col px-4 py-2 text-white gap-1 flex-1'>
                 <h2 className='uppercase text-lg text-[#9CA3AF]'>Live Data</h2>
                 <div className='flex flex-row justify-between'>
                     <p>Altitude</p>
@@ -160,7 +231,6 @@ function Sidebar({ isRunning, latestPacket, updateTelemetryData, setIsRunning })
             </div>
 
             <img src={Logo} width={64} height={64} className='absolute bottom-[10px] right-[10px]' />
-
         </motion.div>
     )
 }
