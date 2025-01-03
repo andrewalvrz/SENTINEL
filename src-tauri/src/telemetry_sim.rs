@@ -1,9 +1,10 @@
 use chrono::{Datelike, Timelike, Local};
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
+use tauri::Emitter;
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TelemetryPacket {
     id: i32,
     year: i32,
@@ -133,4 +134,24 @@ pub fn mockdata(count: i32) -> Vec<TelemetryPacket> {
     }
 
     packets
+}
+
+#[tauri::command]
+pub async fn stream_telemetry(window: tauri::Window) {
+    println!("Starting telemetry stream from Rust...");
+    let packets = mockdata(125);
+    println!("Generated {} packets", packets.len());
+    
+    for (i, packet) in packets.iter().enumerate() {
+        println!("Sending packet {} with altitude {}", i + 1, packet.altitude);
+        if let Err(e) = window.emit("telemetry-packet", &packet) {
+            eprintln!("Failed to emit packet {}: {:?}", i + 1, e);
+            return;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+    }
+    
+    if let Err(e) = window.emit("telemetry-complete", ()) {
+        eprintln!("Failed to emit complete signal: {:?}", e);
+    }
 }

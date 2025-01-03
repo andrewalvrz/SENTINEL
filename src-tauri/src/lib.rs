@@ -5,7 +5,10 @@ mod telemetry_sim;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![telemetry_sim::mockdata])
+        .invoke_handler(tauri::generate_handler![
+            telemetry_sim::mockdata,
+            telemetry_sim::stream_telemetry
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

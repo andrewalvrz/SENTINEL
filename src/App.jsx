@@ -7,7 +7,8 @@ import FlightTrajectory from "./components/FlightTrajectory";
 import Graphs from "./components/Graphs";
 import Orientation from "./components/Orientation";
 import Map from "./components/Map";
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { listen } from '@tauri-apps/api/event';
 
 function App() {
   const [latestPacket, setLatestPacket] = useState({});
@@ -16,26 +17,59 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [packetReceived, setPacketReceived] = useState(false);
 
-  const updateTelemetryData = (allPackets) => {
-    setPackets([allPackets[0]]);
-    setLatestPacket(allPackets[0]);
-
-    let index = 0;
-    const intervalId = setInterval(() => {
-      if (index >= allPackets.length - 1) {
-        clearInterval(intervalId);
-        setIsRunning(false);
-        return;
-      }
-      index++;
-      setCurrentIndex(index);
-      setPacketReceived(true);
-      setPackets(allPackets.slice(0, index + 1));
-      setLatestPacket(allPackets[index]);
-    }, 250);
-
-    return () => clearInterval(intervalId);
+  const resetSimulation = () => {
+    setIsRunning(false); // Add this line to ensure we reset the running state
+    setPackets([]);
+    setLatestPacket({});
+    setCurrentIndex(0);
+    setPacketReceived(false);
   };
+
+  const handlePacket = useCallback((event) => {
+    console.log('Processing packet:', event.payload);
+    setPackets(prev => [...prev, event.payload]);
+    setLatestPacket(event.payload);
+    setPacketReceived(true);
+    setIsRunning(true);
+  }, []);
+
+  const handleComplete = useCallback(() => {
+    console.log('Telemetry complete');
+    setIsRunning(false);
+  }, []);
+
+  useEffect(() => {
+    let unlistenFunctions = [];
+    let mounted = true;
+
+    async function setupListeners() {
+      try {
+        console.log('Setting up event listeners...');
+        
+        // Unregister any existing listeners first
+        unlistenFunctions.forEach(fn => fn());
+        unlistenFunctions = [];
+
+        if (mounted) {
+          const unlistenPacket = await listen('telemetry-packet', handlePacket);
+          const unlistenComplete = await listen('telemetry-complete', handleComplete);
+          
+          unlistenFunctions.push(unlistenPacket, unlistenComplete);
+          console.log('Event listeners setup complete');
+        }
+      } catch (error) {
+        console.error('Error setting up event listeners:', error);
+      }
+    }
+
+    setupListeners();
+
+    return () => {
+      mounted = false;
+      console.log('Cleaning up listeners...');
+      unlistenFunctions.forEach(fn => fn());
+    };
+  }, []); // Empty dependency array since we're using useCallback for handlers
 
   return (
     <main id="main" className="w-screen h-screen bg-black flex flex-col">
@@ -111,13 +145,12 @@ function App() {
         <Sidebar 
           isRunning={isRunning} 
           latestPacket={latestPacket}
-          updateTelemetryData={updateTelemetryData}
           setIsRunning={setIsRunning}
+          resetSimulation={resetSimulation} // Add this line back
         />
       </div>
     </main>
   );
 }
-
 
 export default App;

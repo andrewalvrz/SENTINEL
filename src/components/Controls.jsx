@@ -1,17 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export const useMockDataFlow = (updateTelemetryData, setIsRunning) => {
-
+export const useMockDataFlow = (setIsRunning) => {
     const initializeLaunchSequence = async () => {
         try {
-            setIsRunning(true);
-            const mockData = await invoke('mockdata', { count: 125 });
-            updateTelemetryData(mockData);
-            return mockData;
+            console.log('Starting launch sequence invocation...');
+            const result = await invoke('stream_telemetry');
+            console.log('Launch sequence invocation complete:', result);
+            return true;
         } catch (error) {
-            console.error('Error initializing launch sequence:', error);
+            console.error('Error in launch sequence:', error);
             setIsRunning(false);
-            return [];
+            return false;
         }
     };
 
