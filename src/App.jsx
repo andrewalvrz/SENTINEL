@@ -105,9 +105,9 @@ function App() {
                 roll: packet.roll
               }))}
             />
-
           </div>
         </div>
+
         <Sidebar 
           isRunning={isRunning} 
           latestPacket={latestPacket}

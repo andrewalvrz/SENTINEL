@@ -116,23 +116,46 @@ function Sidebar({ isRunning, latestPacket, updateTelemetryData, setIsRunning })
                 </div>
                 <div className='flex flex-row justify-between'>
                     <p>SNR</p>
-                    <p>9.50 dBm</p>
+                    <p>{latestPacket.snr?.toFixed(2) || "0.00"} dBm</p>
                 </div>
                 <div className='flex flex-row justify-between'>
                     <p>Pressure</p>
-                    <p>1017.00 bar (&Delta;: 17.00 bar)</p>
+                    <p>{latestPacket.pressure?.toFixed(2) || "0.00"} bar</p>
+                </div>
+
+                <div className='flex flex-row justify-between'>
+                    <p>Acceleration (X Axis)</p>
+                    <p>{latestPacket.acceleration_x?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
                 </div>
                 <div className='flex flex-row justify-between'>
-                    <p>Acceleration</p>
-                    <p>0.97 m/s<sup>2</sup> (&Delta;: 0.07 m/s<sup>2</sup>)</p>
+                    <p>Acceleration (Y Axis)</p>
+                    <p>{latestPacket.acceleration_y?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
                 </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Acceleration (Z Axis)</p>
+                    <p>{latestPacket.acceleration_z?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
+                </div>
+
+                <div className='flex flex-row justify-between'>
+                    <p>Velocity (X Axis)</p>
+                    <p>{latestPacket.velocity_x?.toFixed(2) || "0.00"} m/s</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Velocity (Y Axis)</p>
+                    <p>{latestPacket.velocity_y?.toFixed(2) || "0.00"} m/s</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Velocity (Z Axis)</p>
+                    <p>{latestPacket.velocity_z?.toFixed(2) || "0.00"} m/s</p>
+                </div>
+
                 <div className='flex flex-row justify-between'>
                     <p>Longitude</p>
-                    <p>32.9903312</p>
+                    <p>{latestPacket.longitude?.toFixed(7) || "0.00"}</p>
                 </div>
                 <div className='flex flex-row justify-between'>
                     <p>Latitude</p>
-                    <p>-106.9747588</p>
+                    <p>{latestPacket.latitude?.toFixed(7) || "0.00"}</p>
                 </div>
             </div>
 
