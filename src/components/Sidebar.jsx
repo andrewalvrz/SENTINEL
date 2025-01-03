@@ -5,7 +5,7 @@ import Logo from "../assets/Logo.png";
 import { useState, useCallback } from "react";
 import { useMockDataFlow } from './Controls';
 
-function Sidebar({ isRunning, latestPacket, setIsRunning, resetSimulation }) {
+function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
     const mWidth = useMotionValue(window.innerWidth / 4.5);
     const [consoleArray, setConsoleArray] = useState([]);
@@ -61,9 +61,7 @@ function Sidebar({ isRunning, latestPacket, setIsRunning, resetSimulation }) {
         }
         setConsoleArray(prev => [...prev, "Initializing launch sequence..."]);
         const success = await initializeLaunchSequence();
-        if (success) {
-            setConsoleArray(prev => [...prev, "Launch sequence initialized successfully"]);
-        } else {
+        if (!success) {
             setConsoleArray(prev => [...prev, "Launch sequence initialization failed"]);
         }
     };

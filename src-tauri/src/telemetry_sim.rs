@@ -135,20 +135,17 @@ pub fn mockdata(count: i32) -> Vec<TelemetryPacket> {
 
     packets
 }
-
+// This function will emit TEST telemetry data 
 #[tauri::command]
 pub async fn stream_telemetry(window: tauri::Window) {
-    println!("Starting telemetry stream from Rust...");
-    let packets = mockdata(125);
-    println!("Generated {} packets", packets.len());
+    let packets = mockdata(125); // sending 125 packets          
     
-    for (i, packet) in packets.iter().enumerate() {
-        println!("Sending packet {} with altitude {}", i + 1, packet.altitude);
-        if let Err(e) = window.emit("telemetry-packet", &packet) {
-            eprintln!("Failed to emit packet {}: {:?}", i + 1, e);
+    for packet in packets.iter() {      // Iterating over the packets
+        if let Err(e) = window.emit("telemetry-packet", &packet) {  // Emitting the packet (for listener in front end)
+            eprintln!("Failed to emit packet: {:?}", e);
             return;
         }
-        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;  // Delay between packets
     }
     
     if let Err(e) = window.emit("telemetry-complete", ()) {
