@@ -7,7 +7,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             telemetry_sim::mockdata,
-            telemetry_sim::stream_telemetry
+            telemetry_sim::stream_telemetry,
+            telemetry_sim::serial_port
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

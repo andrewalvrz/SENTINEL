@@ -1,8 +1,10 @@
-use chrono::{Datelike, Timelike, Local};
+use chrono::{Datelike, Local, Timelike};
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 use tauri::Emitter;
 
+use std::io::{self, Read};
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TelemetryPacket {
@@ -60,10 +62,22 @@ fn add_noise(value: f64, magnitude: f64) -> f64 {
 #[tauri::command]
 pub fn mockdata(count: i32) -> Vec<TelemetryPacket> {
     let flight_phases = FlightPhases {
-        launch: FlightPhase { duration: 0.1, max_altitude: 500.0 },
-        ascent: FlightPhase { duration: 0.4, max_altitude: 2000.0 },
-        cruise: FlightPhase { duration: 0.4, max_altitude: 2000.0 },
-        descent: FlightPhase { duration: 0.1, max_altitude: 0.0 },
+        launch: FlightPhase {
+            duration: 0.1,
+            max_altitude: 500.0,
+        },
+        ascent: FlightPhase {
+            duration: 0.4,
+            max_altitude: 2000.0,
+        },
+        cruise: FlightPhase {
+            duration: 0.4,
+            max_altitude: 2000.0,
+        },
+        descent: FlightPhase {
+            duration: 0.1,
+            max_altitude: 0.0,
+        },
     };
 
     let base_date = Local::now();
@@ -72,27 +86,48 @@ pub fn mockdata(count: i32) -> Vec<TelemetryPacket> {
     for i in 0..count {
         let progress = i as f64 / (count - 1) as f64;
         let timestamp = base_date + chrono::Duration::seconds(i as i64);
-        
+
         // Calculate phase and progress
         let (phase, altitude) = if progress < flight_phases.launch.duration {
             let phase_progress = progress / flight_phases.launch.duration;
-            ("LAUNCH", flight_phases.launch.max_altitude * phase_progress.powf(0.5))
+            (
+                "LAUNCH",
+                flight_phases.launch.max_altitude * phase_progress.powf(0.5),
+            )
         } else if progress < flight_phases.launch.duration + flight_phases.ascent.duration {
-            let phase_progress = (progress - flight_phases.launch.duration) / flight_phases.ascent.duration;
-            ("ASCENT", flight_phases.launch.max_altitude + 
-                (flight_phases.ascent.max_altitude - flight_phases.launch.max_altitude) * phase_progress)
-        } else if progress < flight_phases.launch.duration + flight_phases.ascent.duration + flight_phases.cruise.duration {
-            ("CRUISE", flight_phases.ascent.max_altitude + add_noise(0.0, 50.0))
+            let phase_progress =
+                (progress - flight_phases.launch.duration) / flight_phases.ascent.duration;
+            (
+                "ASCENT",
+                flight_phases.launch.max_altitude
+                    + (flight_phases.ascent.max_altitude - flight_phases.launch.max_altitude)
+                        * phase_progress,
+            )
+        } else if progress
+            < flight_phases.launch.duration
+                + flight_phases.ascent.duration
+                + flight_phases.cruise.duration
+        {
+            (
+                "CRUISE",
+                flight_phases.ascent.max_altitude + add_noise(0.0, 50.0),
+            )
         } else {
-            let phase_progress = (progress - flight_phases.launch.duration - flight_phases.ascent.duration - 
-                flight_phases.cruise.duration) / flight_phases.descent.duration;
-            ("DESCENT", flight_phases.ascent.max_altitude * (1.0 - phase_progress.powf(0.5)))
+            let phase_progress = (progress
+                - flight_phases.launch.duration
+                - flight_phases.ascent.duration
+                - flight_phases.cruise.duration)
+                / flight_phases.descent.duration;
+            (
+                "DESCENT",
+                flight_phases.ascent.max_altitude * (1.0 - phase_progress.powf(0.5)),
+            )
         };
 
         let altitude = altitude.max(0.0);
         let temperature = 30.0 - (altitude * 0.0065);
         let pressure = 1013.25 * (-altitude / 7400.0).exp();
-        
+
         // Base coordinates (White Sands Missile Range area)
         let base_latitude = 32.3841;
         let base_longitude = -106.4750;
@@ -109,11 +144,19 @@ pub fn mockdata(count: i32) -> Vec<TelemetryPacket> {
             second: timestamp.second(),
             acceleration_x: add_noise(0.0, 0.5),
             acceleration_y: add_noise(0.0, 0.5),
-            acceleration_z: if phase == "LAUNCH" { -15.0 } else { -9.81 + add_noise(0.0, 0.2) },
+            acceleration_z: if phase == "LAUNCH" {
+                -15.0
+            } else {
+                -9.81 + add_noise(0.0, 0.2)
+            },
             velocity_x: add_noise(0.0, 0.2),
             velocity_y: add_noise(0.0, 0.2),
             velocity_z: add_noise(0.0, 0.2),
-            pitch: if phase == "DESCENT" { -175.0 + add_noise(0.0, 5.0) } else { add_noise(0.0, 5.0) },
+            pitch: if phase == "DESCENT" {
+                -175.0 + add_noise(0.0, 5.0)
+            } else {
+                add_noise(0.0, 5.0)
+            },
             roll: add_noise(0.0, 2.0),
             yaw: add_noise(180.0, 5.0),
             temperature,
@@ -135,20 +178,88 @@ pub fn mockdata(count: i32) -> Vec<TelemetryPacket> {
 
     packets
 }
-// This function will emit TEST telemetry data 
+// This function will emit TEST telemetry data
 #[tauri::command]
 pub async fn stream_telemetry(window: tauri::Window) {
-    let packets = mockdata(125); // sending 125 packets          
-    
-    for packet in packets.iter() {      // Iterating over the packets
-        if let Err(e) = window.emit("telemetry-packet", &packet) {  // Emitting the packet (for listener in front end)
+    let packets = mockdata(125); // sending 125 packets
+
+    for packet in packets.iter() {
+        // Iterating over the packets
+        if let Err(e) = window.emit("telemetry-packet", &packet) {
+            // Emitting the packet (for listener in front end)
             eprintln!("Failed to emit packet: {:?}", e);
             return;
         }
-        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;  // Delay between packets
+        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await; // Delay between packets
     }
-    
+
     if let Err(e) = window.emit("telemetry-complete", ()) {
         eprintln!("Failed to emit complete signal: {:?}", e);
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct SerialPortResponse {
+    success: bool,
+    message: String,
+}
+
+#[tauri::command]
+pub async fn serial_port() -> Result<SerialPortResponse, String> {
+    // List available ports
+    let ports = serialport::available_ports().map_err(|e| e.to_string())?;
+    
+    println!("Available ports:");
+    for p in ports {
+        println!("{}", p.port_name);
+    }
+
+    // Configure and open the port
+    let port_name = "/dev/ttyUSB0";
+    let baud_rate = 9600;
+
+    let port = serialport::new(port_name, baud_rate)
+        .timeout(Duration::from_millis(1000))
+        .open()
+        .map_err(|e| e.to_string())?;
+
+    println!("Reading from port: {}", port_name);
+
+    // Read data in a loop
+    let mut serial_buf: Vec<u8> = vec![0; 1000];
+    let mut port = port;
+
+    // Note: In a real application, you might want to handle this differently
+    // as an infinite loop isn't ideal for a command response
+    loop {
+        match port.read(serial_buf.as_mut_slice()) {
+            Ok(bytes_read) => {
+                if bytes_read > 0 {
+                    if let Ok(data) = String::from_utf8(serial_buf[..bytes_read].to_vec()) {
+                        print!("{}", data);
+                        return Ok(SerialPortResponse {
+                            success: true,
+                            message: data,
+                        });
+                    } else {
+                        let bytes = &serial_buf[..bytes_read];
+                        print!("Raw bytes: {:?}", bytes);
+                        return Ok(SerialPortResponse {
+                            success: true,
+                            message: format!("Raw bytes: {:?}", bytes),
+                        });
+                    }
+                }
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => {
+                continue;
+            }
+            Err(e) => {
+                return Ok(SerialPortResponse {
+                    success: false,
+                    message: format!("Error reading from port: {}", e),
+                });
+            }
+        }
     }
 }

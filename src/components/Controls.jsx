@@ -14,6 +14,7 @@ export const useMockDataFlow = (setIsRunning) => {
 
     const systemCheck = async () => {
         // Add system check logic here
+        await invoke('serial_port');
         return true;
     };
 
