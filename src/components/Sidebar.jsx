@@ -3,7 +3,7 @@ import { cn } from "../../src/utils";
 import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
 import { useState, useCallback } from "react";
-import { useMockDataFlow } from './Controls';
+import { useMockDataFlow, useSerialPorts } from './Controls';
 
 function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
@@ -11,6 +11,8 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
     const { initializeLaunchSequence, systemCheck } = useMockDataFlow(setIsRunning);
+    const { ports } = useSerialPorts();
+    const [selectedPort, setSelectedPort] = useState('');
 
     // Animation variants
     const tabContentVariants = {
@@ -157,12 +159,24 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
                             className="absolute inset-0"
                         >
                             <div className="flex flex-col gap-2 p-4">
+                                <select 
+                                    className="w-full bg-zinc-800 text-[#9CA3AF] py-2 px-4"
+                                    value={selectedPort}
+                                    onChange={(e) => setSelectedPort(e.target.value)}
+                                >
+                                    <option value="" disabled>Select a port</option>
+                                    {ports.map(port => (
+                                        <option key={port} value={port}>{port}</option>
+                                    ))}
+                                </select>
+                                
                                 <button 
                                     onClick={handleLaunchSequence}
                                     className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
                                 >
                                     Initialize Launch Sequence
                                 </button>
+                                
                                 <button 
                                     onClick={handleSystemCheck}
                                     className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"

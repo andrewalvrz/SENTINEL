@@ -1,4 +1,29 @@
 import { invoke } from "@tauri-apps/api/core";
+import { useState, useEffect } from 'react';
+
+export const useSerialPorts = () => {
+    const [ports, setPorts] = useState([]);
+
+    const listPorts = async () => {
+        try {
+            const response = await invoke('list_ports');
+            if (response.success) {
+                setPorts(response.ports);  // Use actual ports from response
+            }
+            return response;
+        } catch (error) {
+            console.error('Error listing ports:', error);
+            setPorts([]);
+            return { success: false, message: error.toString(), ports: [] };
+        }
+    };
+
+    useEffect(() => {
+        listPorts();
+    }, []);
+
+    return { ports, listPorts };
+};
 
 export const useMockDataFlow = (setIsRunning) => {
     const initializeLaunchSequence = async () => {
