@@ -11,7 +11,7 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
     const { initializeLaunchSequence, systemCheck } = useMockDataFlow(setIsRunning);
-    const { ports } = useSerialPorts();
+    const { ports, listPorts } = useSerialPorts();  // Get listPorts function
     const [selectedPort, setSelectedPort] = useState('');
 
     // Animation variants
@@ -75,6 +75,16 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
             setConsoleArray(prev => [...prev, "System check completed successfully"]);
         } else {
             setConsoleArray(prev => [...prev, "System check failed"]);
+        }
+    };
+
+    const handleRefreshPorts = async () => {
+        setConsoleArray(prev => [...prev, "Refreshing available ports..."]);
+        const response = await listPorts();
+        if (response.success) {
+            setConsoleArray(prev => [...prev, "Port list updated"]);
+        } else {
+            setConsoleArray(prev => [...prev, "Failed to refresh ports"]);
         }
     };
 
@@ -159,16 +169,24 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
                             className="absolute inset-0"
                         >
                             <div className="flex flex-col gap-2 p-4">
-                                <select 
-                                    className="w-full bg-zinc-800 text-[#9CA3AF] py-2 px-4"
-                                    value={selectedPort}
-                                    onChange={(e) => setSelectedPort(e.target.value)}
-                                >
-                                    <option value="" disabled>Select a port</option>
-                                    {ports.map(port => (
-                                        <option key={port} value={port}>{port}</option>
-                                    ))}
-                                </select>
+                                <div className="flex flex-row gap-2">
+                                    <select 
+                                        className="flex-1 bg-zinc-800 text-[#9CA3AF] py-2 px-4"
+                                        value={selectedPort}
+                                        onChange={(e) => setSelectedPort(e.target.value)}
+                                    >
+                                        <option value="" disabled>Select a port</option>
+                                        {ports.map(port => (
+                                            <option key={port} value={port}>{port}</option>
+                                        ))}
+                                    </select>
+                                    <button 
+                                        onClick={handleRefreshPorts}
+                                        className="bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] px-4"
+                                    >
+                                        ⟳
+                                    </button>
+                                </div>
                                 
                                 <button 
                                     onClick={handleLaunchSequence}
