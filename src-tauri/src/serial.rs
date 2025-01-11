@@ -80,7 +80,7 @@ pub async fn monitor_port(
                 Ok(mut port_clone) => {
                     match port_clone.read(serial_buf.as_mut_slice()) {
                         Ok(t) => {
-                            if (t > 0) {
+                            if t > 0 {
                                 let received_data = String::from_utf8_lossy(&serial_buf[..t]);
                                 println!("Received: {}", received_data);
                                 Ok(SerialPortResponse {
