@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 export const useSerialPorts = () => {
     const [ports, setPorts] = useState([]);
@@ -18,11 +18,31 @@ export const useSerialPorts = () => {
         }
     };
 
+    const openPort = async (portName, baudRate = 9600) => {
+        try {
+            const response = await invoke('open_port', { portName, baudRate });
+            return response;
+        } catch (error) {
+            console.error('Error opening port:', error);
+            return { success: false, message: error.toString() };
+        }
+    };
+
+    const closePort = async () => {
+        try {
+            const response = await invoke('close_port');
+            return response;
+        } catch (error) {
+            console.error('Error closing port:', error);
+            return { success: false, message: error.toString() };
+        }
+    };
+
     useEffect(() => {
         listPorts();
     }, []);
 
-    return { ports, listPorts };
+    return { ports, listPorts, openPort, closePort };
 };
 
 export const useMockDataFlow = (setIsRunning) => {
@@ -48,3 +68,46 @@ export const useMockDataFlow = (setIsRunning) => {
         systemCheck
     };
 };
+
+export function useSerialMonitor() {
+    const [isMonitoring, setIsMonitoring] = useState(false);
+    const monitorInterval = useRef(null);
+
+    const toggleMonitoring = useCallback(async (enabled) => {
+        if (enabled) {
+            // Start monitoring
+            monitorInterval.current = setInterval(async () => {
+                try {
+                    const response = await invoke('monitor_port');
+                    if (response.success && response.message !== "No data available") {
+                        console.log(response.message);
+                    }
+                } catch (error) {
+                    console.error('Monitor error:', error);
+                    // Stop monitoring if there's an error
+                    setIsMonitoring(false);
+                    clearInterval(monitorInterval.current);
+                }
+            }, 100); // Poll every 100ms
+            setIsMonitoring(true);
+        } else {
+            // Stop monitoring
+            if (monitorInterval.current) {
+                clearInterval(monitorInterval.current);
+                monitorInterval.current = null;
+            }
+            setIsMonitoring(false);
+        }
+    }, []);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (monitorInterval.current) {
+                clearInterval(monitorInterval.current);
+            }
+        };
+    }, []);
+
+    return { isMonitoring, toggleMonitoring };
+}

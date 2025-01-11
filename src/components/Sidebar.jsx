@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from "../../src/utils";
 import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
-import { useCallback } from "react";
-import { useMockDataFlow, useSerialPorts } from './Controls';
+import { useMockDataFlow, useSerialPorts, useSerialMonitor } from './Controls';
 
 function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
@@ -11,9 +10,9 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
     const { initializeLaunchSequence, systemCheck } = useMockDataFlow(setIsRunning);
-    const { ports, listPorts } = useSerialPorts();  // Get listPorts function
+    const { ports, listPorts, openPort, closePort } = useSerialPorts();  // Get listPorts, openPort, closePort functions
     const [selectedPort, setSelectedPort] = useState('');
-    const [showConsoleOutput, setShowConsoleOutput] = useState(false);
+    const { isMonitoring, toggleMonitoring } = useSerialMonitor();
 
     // Animation variants
     const tabContentVariants = {
@@ -87,6 +86,27 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
         } else {
             setConsoleArray(prev => [...prev, "Failed to refresh ports"]);
         }
+    };
+
+    const handleToggleMonitor = useCallback(() => {
+        toggleMonitoring(!isMonitoring);
+        setConsoleArray(prev => [...prev, 
+            !isMonitoring ? "Started monitoring serial port..." : "Stopped monitoring serial port"
+        ]);
+    }, [isMonitoring, toggleMonitoring]);
+
+    const handleOpenPort = async () => {
+        if (!selectedPort) {
+            setConsoleArray(prev => [...prev, "No port selected"]);
+            return;
+        }
+        const response = await openPort(selectedPort);
+        setConsoleArray(prev => [...prev, response.message]);
+    };
+
+    const handleClosePort = async () => {
+        const response = await closePort();
+        setConsoleArray(prev => [...prev, response.message]);
     };
 
     return (
@@ -189,35 +209,84 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
                                     </button>
                                 </div>
 
+                                <div className="flex flex-row gap-2">
+                                    <button 
+                                        onClick={handleOpenPort}
+                                        disabled={!selectedPort}
+                                        className={cn(
+                                            "flex-1 py-2 px-4",
+                                            selectedPort 
+                                                ? "bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF]" 
+                                                : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+                                        )}
+                                    >
+                                        Open Serial
+                                    </button>
+                                    <button 
+                                        onClick={handleClosePort}
+                                        disabled={!selectedPort}
+                                        className={cn(
+                                            "flex-1 py-2 px-4",
+                                            selectedPort 
+                                                ? "bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF]" 
+                                                : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+                                        )}
+                                    >
+                                        Close Serial
+                                    </button>
+                                </div>
+
                                 {/* Console Output Switch */}
-                                <div className="flex flex-row items-center justify-between w-full bg-zinc-800 py-2 px-4">
-                                    <span className="text-[#9CA3AF]">Show Serial Data on Console</span>
+                                <div className={cn(
+                                    "flex flex-row items-center justify-between w-full py-2 px-4",
+                                    selectedPort ? "bg-zinc-800" : "bg-zinc-900"
+                                )}>
+                                    <span className={cn(
+                                        "text-[#9CA3AF]",
+                                        !selectedPort && "text-zinc-600"
+                                    )}>
+                                        Show Serial Data on Console
+                                    </span>
                                     <button
-                                        onClick={() => setShowConsoleOutput(!showConsoleOutput)}
+                                        onClick={handleToggleMonitor}
+                                        disabled={!selectedPort}
                                         className={cn(
                                             "w-8 h-4 rounded-full relative transition-colors duration-200",
-                                            showConsoleOutput ? "bg-green-600" : "bg-gray-600"
+                                            isMonitoring ? "bg-green-600" : "bg-gray-600",
+                                            !selectedPort && "opacity-50 cursor-not-allowed"
                                         )}
                                     >
                                         <div
                                             className={cn(
                                                 "absolute w-3 h-3 bg-white rounded-full top-0.5 transition-transform duration-200",
-                                                showConsoleOutput ? "translate-x-4" : "translate-x-1"
+                                                isMonitoring ? "translate-x-4" : "translate-x-1"
                                             )}
                                         />
                                     </button>
                                 </div>
-                                
+
                                 <button 
                                     onClick={handleLaunchSequence}
-                                    className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
+                                    disabled={!selectedPort}
+                                    className={cn(
+                                        "w-full py-2 px-4",
+                                        selectedPort 
+                                            ? "bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF]" 
+                                            : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+                                    )}
                                 >
                                     Initialize Launch Sequence
                                 </button>
-                                
+
                                 <button 
                                     onClick={handleSystemCheck}
-                                    className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
+                                    disabled={!selectedPort}
+                                    className={cn(
+                                        "w-full py-2 px-4",
+                                        selectedPort 
+                                            ? "bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF]" 
+                                            : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+                                    )}
                                 >
                                     System Check
                                 </button>
@@ -284,4 +353,4 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     )
 }
 
-export default Sidebar
+export default Sidebar;

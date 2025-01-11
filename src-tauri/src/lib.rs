@@ -15,7 +15,8 @@ pub fn run() {
             telemetry_sim::stream_telemetry,
             serial::list_ports,
             serial::open_port,
-            serial::close_port
+            serial::close_port,
+            serial::monitor_port  // Add this line
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -35,7 +35,7 @@ pub async fn open_port(
     baud_rate: u32
 ) -> Result<SerialPortResponse, String> {
     let port = serialport::new(port_name, baud_rate)
-        .timeout(Duration::from_millis(10))
+        .timeout(Duration::from_millis(10))  // Revert to 10ms timeout
         .open()
         .map_err(|e| e.to_string())?;
 
@@ -65,4 +65,43 @@ pub async fn close_port(
         message: "Port closed successfully".to_string(),
         ports: vec![], // Empty ports array for this response
     })
+}
+
+#[tauri::command]
+pub async fn monitor_port(
+    state: tauri::State<'_, SerialPortState>
+) -> Result<SerialPortResponse, String> {
+    let port_state = state.0.lock().unwrap();
+    
+    match &*port_state {
+        Some(port) => {
+            let mut serial_buf: Vec<u8> = vec![0; 1024];
+            match port.try_clone() {
+                Ok(mut port_clone) => {
+                    match port_clone.read(serial_buf.as_mut_slice()) {
+                        Ok(t) => {
+                            if (t > 0) {
+                                let received_data = String::from_utf8_lossy(&serial_buf[..t]);
+                                println!("Received: {}", received_data);
+                                Ok(SerialPortResponse {
+                                    success: true,
+                                    message: received_data.to_string(),
+                                    ports: vec![],
+                                })
+                            } else {
+                                Ok(SerialPortResponse {
+                                    success: true,
+                                    message: "No data available".to_string(),
+                                    ports: vec![],
+                                })
+                            }
+                        }
+                        Err(e) => Err(format!("Failed to read from port: {}", e))
+                    }
+                }
+                Err(e) => Err(format!("Failed to clone port: {}", e))
+            }
+        }
+        None => Err("No port is currently open".to_string())
+    }
 }
