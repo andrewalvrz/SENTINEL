@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 use tauri::Emitter;
 
-use std::io::{self, Read};
-use std::time::Duration;
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TelemetryPacket {
@@ -198,68 +197,4 @@ pub async fn stream_telemetry(window: tauri::Window) {
     }
 }
 
-#[derive(Debug, Serialize)]
-pub struct SerialPortResponse {
-    success: bool,
-    message: String,
-}
 
-#[tauri::command]
-pub async fn serial_port() -> Result<SerialPortResponse, String> {
-    // List available ports
-    let ports = serialport::available_ports().map_err(|e| e.to_string())?;
-    
-    println!("Available ports:");
-    for p in ports {
-        println!("{}", p.port_name);
-    }
-
-    // Configure and open the port
-    let port_name = "/dev/ttyUSB0";
-    let baud_rate = 9600;
-
-    let port = serialport::new(port_name, baud_rate)
-        .timeout(Duration::from_millis(1000))
-        .open()
-        .map_err(|e| e.to_string())?;
-
-    println!("Reading from port: {}", port_name);
-
-    // Read data in a loop
-    let mut serial_buf: Vec<u8> = vec![0; 1000];
-    let mut port = port;
-
-    // Note: In a real application, you might want to handle this differently
-    // as an infinite loop isn't ideal for a command response
-    loop {
-        match port.read(serial_buf.as_mut_slice()) {
-            Ok(bytes_read) => {
-                if bytes_read > 0 {
-                    if let Ok(data) = String::from_utf8(serial_buf[..bytes_read].to_vec()) {
-                        print!("{}", data);
-                        return Ok(SerialPortResponse {
-                            success: true,
-                            message: data,
-                        });
-                    } else {
-                        let bytes = &serial_buf[..bytes_read];
-                        print!("Raw bytes: {:?}", bytes);
-                        return Ok(SerialPortResponse {
-                            success: true,
-                            message: format!("Raw bytes: {:?}", bytes),
-                        });
-                    }
-                }
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::TimedOut => {
-                continue;
-            }
-            Err(e) => {
-                return Ok(SerialPortResponse {
-                    success: false,
-                    message: format!("Error reading from port: {}", e),
-                });
-            }
-        }
-    }
-}
