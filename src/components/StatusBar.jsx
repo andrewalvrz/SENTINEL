@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Satellite, BatteryFull, SignalHigh } from 'lucide-react';
 import { cn } from "../utils";
 
 function StatusBar({ missionTime, satellites, connected, RSSI, battery }) {
+    const [showConsoleOutput, setShowConsoleOutput] = useState(false);
 
     function secondsToHHMMSS(seconds) {
         const hours = Math.floor(seconds / 3600);
@@ -55,7 +56,6 @@ function StatusBar({ missionTime, satellites, connected, RSSI, battery }) {
                     <BatteryFull size={18} />
                 </div>
             </div>
-
         </div>
     )
 }

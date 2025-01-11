@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { cn } from "../../src/utils";
 import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useMockDataFlow, useSerialPorts } from './Controls';
 
 function Sidebar({ isRunning, latestPacket, setIsRunning }) {
@@ -13,6 +13,7 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const { initializeLaunchSequence, systemCheck } = useMockDataFlow(setIsRunning);
     const { ports, listPorts } = useSerialPorts();  // Get listPorts function
     const [selectedPort, setSelectedPort] = useState('');
+    const [showConsoleOutput, setShowConsoleOutput] = useState(false);
 
     // Animation variants
     const tabContentVariants = {
@@ -187,6 +188,25 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
                                         ⟳
                                     </button>
                                 </div>
+
+                                {/* Console Output Switch */}
+                                <div className="flex flex-row items-center justify-between w-full bg-zinc-800 py-2 px-4">
+                                    <span className="text-[#9CA3AF]">Show Serial Data on Console</span>
+                                    <button
+                                        onClick={() => setShowConsoleOutput(!showConsoleOutput)}
+                                        className={cn(
+                                            "w-8 h-4 rounded-full relative transition-colors duration-200",
+                                            showConsoleOutput ? "bg-green-600" : "bg-gray-600"
+                                        )}
+                                    >
+                                        <div
+                                            className={cn(
+                                                "absolute w-3 h-3 bg-white rounded-full top-0.5 transition-transform duration-200",
+                                                showConsoleOutput ? "translate-x-4" : "translate-x-1"
+                                            )}
+                                        />
+                                    </button>
+                                </div>
                                 
                                 <button 
                                     onClick={handleLaunchSequence}
@@ -201,6 +221,7 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
                                 >
                                     System Check
                                 </button>
+
                             </div>
                         </motion.div>
                     )}
