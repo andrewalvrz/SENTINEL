@@ -4,6 +4,18 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 export const useSerialPorts = () => {
     const [ports, setPorts] = useState([]);
+    const [parsedData, setParsedData] = useState(null);
+
+    // Add listener for parsed data
+    useEffect(() => {
+        const unlisten = listen('parsed-telemetry', (event) => {
+            setParsedData(event.payload);
+        });
+
+        return () => {
+            unlisten.then(f => f());
+        };
+    }, []);
 
     const listPorts = async () => {
         try {
@@ -43,7 +55,13 @@ export const useSerialPorts = () => {
         listPorts();
     }, []);
 
-    return { ports, listPorts, openPort, closePort };
+    return { 
+        ports, 
+        listPorts, 
+        openPort, 
+        closePort,
+        parsedData 
+    };
 };
 
 export const useMockDataFlow = (setIsRunning) => {
@@ -69,68 +87,3 @@ export const useMockDataFlow = (setIsRunning) => {
         systemCheck
     };
 };
-
-export function useSerialMonitor() {
-    const [isMonitoring, setIsMonitoring] = useState(false);
-    const monitorInterval = useRef(null);
-    const errorCount = useRef(0);
-    const [parsedData, setParsedData] = useState(null);
-
-    // Add listener for parsed data
-    useEffect(() => {
-        const unlisten = listen('parsed-telemetry', (event) => {
-            setParsedData(event.payload);
-            console.log('Received parsed data:', event.payload);
-        });
-
-        return () => {
-            unlisten.then(f => f());
-        };
-    }, []);
-
-    const toggleMonitoring = useCallback(async (enabled) => {
-        if (enabled) {
-            errorCount.current = 0;
-            monitorInterval.current = setInterval(async () => {
-                try {
-                    const response = await invoke('monitor_port');
-                    if (response.success) {
-                        errorCount.current = 0;
-                        if (response.message !== "No data available") {
-                            // Just invoke parse_serial_data, it will emit the event
-                            await invoke('parse_serial_data', {
-                                rawData: response.message
-                            });
-                        }
-                    }
-                } catch (error) {
-                    errorCount.current += 1;
-                    console.error('Monitor error:', error);
-                    
-                    if (errorCount.current > 5) {
-                        setIsMonitoring(false);
-                        clearInterval(monitorInterval.current);
-                    }
-                }
-            }, 100);
-            setIsMonitoring(true);
-        } else {
-            if (monitorInterval.current) {
-                clearInterval(monitorInterval.current);
-                monitorInterval.current = null;
-            }
-            setIsMonitoring(false);
-        }
-    }, []);
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (monitorInterval.current) {
-                clearInterval(monitorInterval.current);
-            }
-        };
-    }, []);
-
-    return { isMonitoring, toggleMonitoring, parsedData };
-}

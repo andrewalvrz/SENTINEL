@@ -2,17 +2,17 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from "../../src/utils";
 import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
-import { useMockDataFlow, useSerialPorts, useSerialMonitor } from './Controls';
+import { useMockDataFlow, useSerialPorts } from './Controls';
 
 function Sidebar({ isRunning, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
     const mWidth = useMotionValue(window.innerWidth / 4.5);
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
+    const [showParsedData, setShowParsedData] = useState(false);
     const { initializeLaunchSequence, systemCheck } = useMockDataFlow(setIsRunning);
-    const { ports, listPorts, openPort, closePort } = useSerialPorts();  // Get listPorts, openPort, closePort functions
+    const { ports, listPorts, openPort, closePort, parsedData } = useSerialPorts();
     const [selectedPort, setSelectedPort] = useState('');
-    const { isMonitoring, toggleMonitoring, parsedData } = useSerialMonitor();
 
     // Animation variants
     const tabContentVariants = {
@@ -88,13 +88,6 @@ function Sidebar({ isRunning, setIsRunning }) {
         }
     };
 
-    const handleToggleMonitor = useCallback(() => {
-        toggleMonitoring(!isMonitoring);
-        setConsoleArray(prev => [...prev, 
-            !isMonitoring ? "Started monitoring serial port..." : "Stopped monitoring serial port"
-        ]);
-    }, [isMonitoring, toggleMonitoring]);
-
     const handleOpenPort = async () => {
         if (!selectedPort) {
             setConsoleArray(prev => [...prev, "No port selected"]);
@@ -108,6 +101,13 @@ function Sidebar({ isRunning, setIsRunning }) {
         const response = await closePort();
         setConsoleArray(prev => [...prev, response.message]);
     };
+
+    const handleToggleParsedData = useCallback(() => {
+        setShowParsedData(!showParsedData);
+        setConsoleArray(prev => [...prev, 
+            !showParsedData ? "Started showing parsed data..." : "Stopped showing parsed data"
+        ]);
+    }, [showParsedData]);
 
     return (
         <motion.div
@@ -236,7 +236,7 @@ function Sidebar({ isRunning, setIsRunning }) {
                                     </button>
                                 </div>
 
-                                {/* Console Output Switch */}
+                                {/* Parsed Data Toggle Switch */}
                                 <div className={cn(
                                     "flex flex-row items-center justify-between w-full py-2 px-4",
                                     selectedPort ? "bg-zinc-800" : "bg-zinc-900"
@@ -245,21 +245,21 @@ function Sidebar({ isRunning, setIsRunning }) {
                                         "text-[#9CA3AF]",
                                         !selectedPort && "text-zinc-600"
                                     )}>
-                                        Show Serial Data on Console
+                                        Show Parsed Data
                                     </span>
                                     <button
-                                        onClick={handleToggleMonitor}
+                                        onClick={handleToggleParsedData}
                                         disabled={!selectedPort}
                                         className={cn(
                                             "w-8 h-4 rounded-full relative transition-colors duration-200",
-                                            isMonitoring ? "bg-green-600" : "bg-gray-600",
+                                            showParsedData ? "bg-green-600" : "bg-gray-600",
                                             !selectedPort && "opacity-50 cursor-not-allowed"
                                         )}
                                     >
                                         <div
                                             className={cn(
                                                 "absolute w-3 h-3 bg-white rounded-full top-0.5 transition-transform duration-200",
-                                                isMonitoring ? "translate-x-4" : "translate-x-1"
+                                                showParsedData ? "translate-x-4" : "translate-x-1"
                                             )}
                                         />
                                     </button>
@@ -299,7 +299,7 @@ function Sidebar({ isRunning, setIsRunning }) {
 
             <div className='flex flex-col px-4 py-2 text-white gap-1 flex-1'>
                 <h2 className='uppercase text-lg text-[#9CA3AF]'>Live Data</h2>
-                {parsedData && (
+                {parsedData && showParsedData && (
                     <>
                         <div className='flex flex-row justify-between'>
                             <p>Acceleration X</p>
