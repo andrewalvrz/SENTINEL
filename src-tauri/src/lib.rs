@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod telemetry_sim;
 mod serial;
+mod data_operations;
 
 use serial::SerialPortState;
 use std::sync::Mutex;
@@ -16,7 +17,8 @@ pub fn run() {
             serial::list_ports,
             serial::open_port,
             serial::close_port,
-            serial::monitor_port  // Add this line
+            serial::monitor_port,
+            data_operations::parse_serial_data
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

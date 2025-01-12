@@ -4,7 +4,7 @@ import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
 import { useMockDataFlow, useSerialPorts, useSerialMonitor } from './Controls';
 
-function Sidebar({ isRunning, latestPacket, setIsRunning }) {
+function Sidebar({ isRunning, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
     const mWidth = useMotionValue(window.innerWidth / 4.5);
     const [consoleArray, setConsoleArray] = useState([]);
@@ -12,7 +12,7 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const { initializeLaunchSequence, systemCheck } = useMockDataFlow(setIsRunning);
     const { ports, listPorts, openPort, closePort } = useSerialPorts();  // Get listPorts, openPort, closePort functions
     const [selectedPort, setSelectedPort] = useState('');
-    const { isMonitoring, toggleMonitoring } = useSerialMonitor();
+    const { isMonitoring, toggleMonitoring, parsedData } = useSerialMonitor();
 
     // Animation variants
     const tabContentVariants = {
@@ -140,7 +140,7 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
                             <p className='z-10'>{tab}</p>
                             {activeTab === tab && (
                                 <motion.div
-                                    className="absolute bottom-0 left-0 right-0 h-full bg-[#09090B]"
+                                    className="absolute bottom-0 left:0 right-0 h-full bg-[#09090B]"
                                     layoutId="activeTab"
                                     initial={false}
                                     transition={{
@@ -299,53 +299,15 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
 
             <div className='flex flex-col px-4 py-2 text-white gap-1 flex-1'>
                 <h2 className='uppercase text-lg text-[#9CA3AF]'>Live Data</h2>
-                <div className='flex flex-row justify-between'>
-                    <p>Altitude</p>
-                    <p>{latestPacket.altitude?.toFixed(2) || "0.00"} m</p>
-                </div>
-                <div className='flex flex-row justify-between'>
-                    <p>SNR</p>
-                    <p>{latestPacket.snr?.toFixed(2) || "0.00"} dBm</p>
-                </div>
-                <div className='flex flex-row justify-between'>
-                    <p>Pressure</p>
-                    <p>{latestPacket.pressure?.toFixed(2) || "0.00"} bar</p>
-                </div>
-
-                <div className='flex flex-row justify-between'>
-                    <p>Acceleration (X Axis)</p>
-                    <p>{latestPacket.acceleration_x?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
-                </div>
-                <div className='flex flex-row justify-between'>
-                    <p>Acceleration (Y Axis)</p>
-                    <p>{latestPacket.acceleration_y?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
-                </div>
-                <div className='flex flex-row justify-between'>
-                    <p>Acceleration (Z Axis)</p>
-                    <p>{latestPacket.acceleration_z?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
-                </div>
-
-                <div className='flex flex-row justify-between'>
-                    <p>Velocity (X Axis)</p>
-                    <p>{latestPacket.velocity_x?.toFixed(2) || "0.00"} m/s</p>
-                </div>
-                <div className='flex flex-row justify-between'>
-                    <p>Velocity (Y Axis)</p>
-                    <p>{latestPacket.velocity_y?.toFixed(2) || "0.00"} m/s</p>
-                </div>
-                <div className='flex flex-row justify-between'>
-                    <p>Velocity (Z Axis)</p>
-                    <p>{latestPacket.velocity_z?.toFixed(2) || "0.00"} m/s</p>
-                </div>
-
-                <div className='flex flex-row justify-between'>
-                    <p>Longitude</p>
-                    <p>{latestPacket.longitude?.toFixed(7) || "0.00"}</p>
-                </div>
-                <div className='flex flex-row justify-between'>
-                    <p>Latitude</p>
-                    <p>{latestPacket.latitude?.toFixed(7) || "0.00"}</p>
-                </div>
+                {parsedData && (
+                    <>
+                        <div className='flex flex-row justify-between'>
+                            <p>Acceleration X</p>
+                            <p>{parsedData.accel_x?.toFixed(2) || "0.00"} m/s²</p>
+                        </div>
+                        {/* Add more data fields as needed */}
+                    </>
+                )}
             </div>
 
             <img src={Logo} width={64} height={64} className='absolute bottom-[10px] right-[10px]' />

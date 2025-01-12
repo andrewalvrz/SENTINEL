@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from '@tauri-apps/api/event';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 export const useSerialPorts = () => {
@@ -73,6 +74,19 @@ export function useSerialMonitor() {
     const [isMonitoring, setIsMonitoring] = useState(false);
     const monitorInterval = useRef(null);
     const errorCount = useRef(0);
+    const [parsedData, setParsedData] = useState(null);
+
+    // Add listener for parsed data
+    useEffect(() => {
+        const unlisten = listen('parsed-telemetry', (event) => {
+            setParsedData(event.payload);
+            console.log('Received parsed data:', event.payload);
+        });
+
+        return () => {
+            unlisten.then(f => f());
+        };
+    }, []);
 
     const toggleMonitoring = useCallback(async (enabled) => {
         if (enabled) {
@@ -83,14 +97,16 @@ export function useSerialMonitor() {
                     if (response.success) {
                         errorCount.current = 0;
                         if (response.message !== "No data available") {
-                            console.log(response.message);
+                            // Just invoke parse_serial_data, it will emit the event
+                            await invoke('parse_serial_data', {
+                                rawData: response.message
+                            });
                         }
                     }
                 } catch (error) {
                     errorCount.current += 1;
                     console.error('Monitor error:', error);
                     
-                    // Only stop monitoring if we get multiple consecutive errors
                     if (errorCount.current > 5) {
                         setIsMonitoring(false);
                         clearInterval(monitorInterval.current);
@@ -116,5 +132,5 @@ export function useSerialMonitor() {
         };
     }, []);
 
-    return { isMonitoring, toggleMonitoring };
+    return { isMonitoring, toggleMonitoring, parsedData };
 }
