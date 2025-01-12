@@ -35,7 +35,7 @@ pub async fn open_port(
     baud_rate: u32
 ) -> Result<SerialPortResponse, String> {
     let port = serialport::new(port_name, baud_rate)
-        .timeout(Duration::from_millis(10))  // Revert to 10ms timeout
+        // Removed timeout setting to prevent disconnections
         .open()
         .map_err(|e| e.to_string())?;
 
@@ -78,11 +78,14 @@ pub async fn monitor_port(
             let mut serial_buf: Vec<u8> = vec![0; 1024];
             match port.try_clone() {
                 Ok(mut port_clone) => {
+                    // Set a longer timeout just for reading
+                    port_clone.set_timeout(Duration::from_millis(100))
+                        .map_err(|e| e.to_string())?;
+                    
                     match port_clone.read(serial_buf.as_mut_slice()) {
                         Ok(t) => {
                             if t > 0 {
                                 let received_data = String::from_utf8_lossy(&serial_buf[..t]);
-                                println!("Received: {}", received_data);
                                 Ok(SerialPortResponse {
                                     success: true,
                                     message: received_data.to_string(),
@@ -95,6 +98,13 @@ pub async fn monitor_port(
                                     ports: vec![],
                                 })
                             }
+                        }
+                        Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                            Ok(SerialPortResponse {
+                                success: true,
+                                message: "No data available".to_string(),
+                                ports: vec![],
+                            })
                         }
                         Err(e) => Err(format!("Failed to read from port: {}", e))
                     }

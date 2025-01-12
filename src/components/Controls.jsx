@@ -72,26 +72,33 @@ export const useMockDataFlow = (setIsRunning) => {
 export function useSerialMonitor() {
     const [isMonitoring, setIsMonitoring] = useState(false);
     const monitorInterval = useRef(null);
+    const errorCount = useRef(0);
 
     const toggleMonitoring = useCallback(async (enabled) => {
         if (enabled) {
-            // Start monitoring
+            errorCount.current = 0;
             monitorInterval.current = setInterval(async () => {
                 try {
                     const response = await invoke('monitor_port');
-                    if (response.success && response.message !== "No data available") {
-                        console.log(response.message);
+                    if (response.success) {
+                        errorCount.current = 0;
+                        if (response.message !== "No data available") {
+                            console.log(response.message);
+                        }
                     }
                 } catch (error) {
+                    errorCount.current += 1;
                     console.error('Monitor error:', error);
-                    // Stop monitoring if there's an error
-                    setIsMonitoring(false);
-                    clearInterval(monitorInterval.current);
+                    
+                    // Only stop monitoring if we get multiple consecutive errors
+                    if (errorCount.current > 5) {
+                        setIsMonitoring(false);
+                        clearInterval(monitorInterval.current);
+                    }
                 }
-            }, 100); // Poll every 100ms
+            }, 100);
             setIsMonitoring(true);
         } else {
-            // Stop monitoring
             if (monitorInterval.current) {
                 clearInterval(monitorInterval.current);
                 monitorInterval.current = null;
