@@ -1,14 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
-export const useSerialPorts = () => {
+export const useSerialPorts = (setConsoleArray) => {
     const [ports, setPorts] = useState([]);
     const [parsedData, setParsedData] = useState(null);
+    const [selectedPort, setSelectedPort] = useState('');
 
-    // Add listener for parsed data
     useEffect(() => {
-        const unlisten = listen('parsed-telemetry', (event) => {
+        const unlisten = listen('telemetry-update', (event) => {
             setParsedData(event.payload);
         });
 
@@ -17,73 +17,87 @@ export const useSerialPorts = () => {
         };
     }, []);
 
-    const listPorts = async () => {
+    const refreshPorts = async () => {
+        setConsoleArray(prev => [...prev, "Refreshing available ports..."]);
         try {
-            const response = await invoke('list_ports');
-            if (response.success) {
-                setPorts(response.ports);  // Use actual ports from response
+            const ports = await invoke('list_serial_ports');
+            setPorts(ports);
+            if (ports.length > 0 && !selectedPort) {
+                setSelectedPort(ports[0]);
             }
-            return response;
+            setConsoleArray(prev => [...prev, `Found ${ports.length} ports`]);
+            return { success: true, ports };
         } catch (error) {
-            console.error('Error listing ports:', error);
+            setConsoleArray(prev => [...prev, `Failed to refresh ports: ${error}`]);
             setPorts([]);
-            return { success: false, message: error.toString(), ports: [] };
+            return { success: false, error };
         }
     };
 
-    const openPort = async (portName, baudRate = 9600) => {
+    const openPort = async () => {
+        if (!selectedPort) {
+            setConsoleArray(prev => [...prev, "No port selected"]);
+            return { success: false };
+        }
         try {
-            const response = await invoke('open_port', { portName, baudRate });
-            return response;
+            const result = await invoke('open_serial', { 
+                portName: selectedPort, 
+                baudRate: 115200 
+            });
+            setConsoleArray(prev => [...prev, result]);
+            // Start the data parser after opening the port
+            await invoke('start_data_parser');
+            return { success: true };
         } catch (error) {
-            console.error('Error opening port:', error);
-            return { success: false, message: error.toString() };
+            setConsoleArray(prev => [...prev, `Failed to open port: ${error}`]);
+            return { success: false, error };
         }
     };
 
     const closePort = async () => {
         try {
-            const response = await invoke('close_port');
-            return response;
+            const result = await invoke('close_serial');
+            setConsoleArray(prev => [...prev, result]);
+            return { success: true };
         } catch (error) {
-            console.error('Error closing port:', error);
-            return { success: false, message: error.toString() };
+            setConsoleArray(prev => [...prev, `Failed to close port: ${error}`]);
+            return { success: false, error };
         }
     };
 
     useEffect(() => {
-        listPorts();
+        refreshPorts();
     }, []);
 
     return { 
-        ports, 
-        listPorts, 
-        openPort, 
+        ports,
+        selectedPort,
+        setSelectedPort,
+        refreshPorts,
+        openPort,
         closePort,
-        parsedData 
+        parsedData
     };
 };
 
-export const useMockDataFlow = (setIsRunning) => {
+export const useMockDataFlow = (setIsRunning, setConsoleArray, isRunning) => {
     const initializeLaunchSequence = async () => {
+        if (isRunning) {
+            setConsoleArray(prev => [...prev, "Launch sequence already running..."]);
+            return false;
+        }
         try {
-            await invoke('stream_telemetry');   // invoking the stream_telemetry function in backend to start the telemetry stream (will always start from 0 and go to 125 unless changed)
+            setConsoleArray(prev => [...prev, "Initializing launch sequence..."]);
+            await invoke('stream_telemetry');
+            setIsRunning(true);
+            setConsoleArray(prev => [...prev, "Launch sequence started successfully"]);
             return true;
         } catch (error) {
-            console.error('Error in launch sequence:', error);
+            setConsoleArray(prev => [...prev, `Launch sequence failed: ${error}`]);
             setIsRunning(false);
             return false;
         }
     };
 
-    const systemCheck = async () => {
-        // Add system check logic here
-        await invoke('serial_port');
-        return true;
-    };
-
-    return {
-        initializeLaunchSequence,
-        systemCheck
-    };
+    return { initializeLaunchSequence };
 };

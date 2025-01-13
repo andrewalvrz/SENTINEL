@@ -10,9 +10,8 @@ function Sidebar({ isRunning, setIsRunning }) {
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
     const [showParsedData, setShowParsedData] = useState(false);
-    const { initializeLaunchSequence, systemCheck } = useMockDataFlow(setIsRunning);
-    const { ports, listPorts, openPort, closePort, parsedData } = useSerialPorts();
-    const [selectedPort, setSelectedPort] = useState('');
+    const { initializeLaunchSequence } = useMockDataFlow(setIsRunning, setConsoleArray, isRunning);
+    const { ports, selectedPort, setSelectedPort, refreshPorts, openPort, closePort, parsedData } = useSerialPorts(setConsoleArray);
 
     // Animation variants
     const tabContentVariants = {
@@ -55,52 +54,6 @@ function Sidebar({ isRunning, setIsRunning }) {
         window.addEventListener("resize", updateWidthAndHeight);
         return () => window.removeEventListener("resize", updateWidthAndHeight);
     }, []);
-
-    const handleLaunchSequence = async () => {
-        if (isRunning) {
-            setConsoleArray(prev => [...prev, "Simulation already running..."]);
-            return;
-        }
-        setConsoleArray(prev => [...prev, "Initializing launch sequence..."]);
-        const success = await initializeLaunchSequence();
-        if (!success) {
-            setConsoleArray(prev => [...prev, "Launch sequence initialization failed"]);
-        }
-    };
-
-    const handleSystemCheck = async () => {
-        setConsoleArray(prev => [...prev, "Running system check..."]);
-        const success = await systemCheck();
-        if (success) {
-            setConsoleArray(prev => [...prev, "System check completed successfully"]);
-        } else {
-            setConsoleArray(prev => [...prev, "System check failed"]);
-        }
-    };
-
-    const handleRefreshPorts = async () => {
-        setConsoleArray(prev => [...prev, "Refreshing available ports..."]);
-        const response = await listPorts();
-        if (response.success) {
-            setConsoleArray(prev => [...prev, "Port list updated"]);
-        } else {
-            setConsoleArray(prev => [...prev, "Failed to refresh ports"]);
-        }
-    };
-
-    const handleOpenPort = async () => {
-        if (!selectedPort) {
-            setConsoleArray(prev => [...prev, "No port selected"]);
-            return;
-        }
-        const response = await openPort(selectedPort);
-        setConsoleArray(prev => [...prev, response.message]);
-    };
-
-    const handleClosePort = async () => {
-        const response = await closePort();
-        setConsoleArray(prev => [...prev, response.message]);
-    };
 
     const handleToggleParsedData = useCallback(() => {
         setShowParsedData(!showParsedData);
@@ -202,7 +155,7 @@ function Sidebar({ isRunning, setIsRunning }) {
                                         ))}
                                     </select>
                                     <button 
-                                        onClick={handleRefreshPorts}
+                                        onClick={refreshPorts}
                                         className="bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] px-4"
                                     >
                                         ⟳
@@ -211,7 +164,7 @@ function Sidebar({ isRunning, setIsRunning }) {
 
                                 <div className="flex flex-row gap-2">
                                     <button 
-                                        onClick={handleOpenPort}
+                                        onClick={openPort}
                                         disabled={!selectedPort}
                                         className={cn(
                                             "flex-1 py-2 px-4",
@@ -223,7 +176,7 @@ function Sidebar({ isRunning, setIsRunning }) {
                                         Open Serial
                                     </button>
                                     <button 
-                                        onClick={handleClosePort}
+                                        onClick={closePort}
                                         disabled={!selectedPort}
                                         className={cn(
                                             "flex-1 py-2 px-4",
@@ -266,7 +219,7 @@ function Sidebar({ isRunning, setIsRunning }) {
                                 </div>
 
                                 <button 
-                                    onClick={handleLaunchSequence}
+                                    onClick={initializeLaunchSequence}
                                     disabled={!selectedPort}
                                     className={cn(
                                         "w-full py-2 px-4",
@@ -276,19 +229,6 @@ function Sidebar({ isRunning, setIsRunning }) {
                                     )}
                                 >
                                     Initialize Launch Sequence
-                                </button>
-
-                                <button 
-                                    onClick={handleSystemCheck}
-                                    disabled={!selectedPort}
-                                    className={cn(
-                                        "w-full py-2 px-4",
-                                        selectedPort 
-                                            ? "bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF]" 
-                                            : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
-                                    )}
-                                >
-                                    System Check
                                 </button>
 
                             </div>
