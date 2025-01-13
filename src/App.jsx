@@ -1,4 +1,3 @@
-//App.jsx
 import "./App.css";
 import StatusBar from "./components/StatusBar";
 import Sidebar from "./components/Sidebar";
@@ -17,22 +16,32 @@ function App() {
   const [packetReceived, setPacketReceived] = useState(false);
 
   useEffect(() => {
-    const unlisten = [];    // Array to store unlisten functions
+    const unlisten = [];
 
     async function setupListeners() {
+      // Listen for telemetry packets
       unlisten.push(
-        await listen('telemetry-packet', event => {   // Listen for telemetry-packet events
-          setPackets(prev => [...prev, event.payload]); // Add packet to packets array
-          setLatestPacket(event.payload);            // Update latest packet
-          setPacketReceived(true);               // Set packet received to true
-          setIsRunning(true);              // Set isRunning to true
-        }),
-        await listen('telemetry-complete', () => setIsRunning(false)) // Stop when backend emits telemetry-complete event
+        await listen('telemetry-packet', event => {
+          setPackets(prev => [...prev, event.payload]);
+          setLatestPacket(event.payload);
+          setPacketReceived(true);
+          setIsRunning(true);
+        })
+      );
+
+      // Optional: Listen for connection status changes
+      unlisten.push(
+        await listen('serial-disconnected', () => {
+          setIsRunning(false);
+          // Optionally clear or preserve existing data
+          // setPackets([]);
+          // setLatestPacket({});
+        })
       );
     }
 
     setupListeners();
-    return () => unlisten.forEach(fn => fn());  // Unlisten when component unmounts (cleanup)
+    return () => unlisten.forEach(fn => fn());
   }, []);
 
   return (

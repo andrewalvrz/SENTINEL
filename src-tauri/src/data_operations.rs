@@ -40,6 +40,30 @@ pub struct TelemetryData {
     snr: f32,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct TelemetryPacket {
+    id: u32,
+    mission_time: String,
+    connected: bool,
+    satellites: u8,
+    rssi: i32,
+    battery: f32,
+    latitude: f64,
+    longitude: f64,
+    altitude: f32,
+    velocity_x: f32,
+    velocity_y: f32,
+    velocity_z: f32,
+    acceleration_x: f32,
+    acceleration_y: f32,
+    acceleration_z: f32,
+    pitch: f32,
+    yaw: f32,
+    roll: f32,
+    minute: u32,
+    second: u32,
+}
+
 #[derive(Debug)]
 pub struct TelemetryBuffer {
     buffer: VecDeque<TelemetryData>,
@@ -226,6 +250,38 @@ fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> 
     })
 }
 
+fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
+    // Extract minute and second from timestamp
+    let time_parts: Vec<&str> = data.timestamp.split('T').collect();
+    let time = time_parts[1].trim_end_matches('Z');
+    let time_components: Vec<&str> = time.split(':').collect();
+    let minute = time_components[1].parse().unwrap_or(0);
+    let second = time_components[2].parse().unwrap_or(0);
+
+    TelemetryPacket {
+        id: packet_id,
+        mission_time: data.timestamp.clone(),
+        connected: true,
+        satellites: data.gps_satellites,
+        rssi: data.rssi,
+        battery: 100.0, // Mock battery value
+        latitude: data.gps_lat as f64,
+        longitude: data.gps_lon as f64,
+        altitude: data.gps_altitude,
+        velocity_x: data.gyro_x,  // Using gyro data for velocity
+        velocity_y: data.gyro_y,
+        velocity_z: data.gyro_z,
+        acceleration_x: data.accel_x,
+        acceleration_y: data.accel_y,
+        acceleration_z: data.accel_z,
+        pitch: data.gyro_x,  // Using gyro data for orientation
+        yaw: data.gyro_y,
+        roll: data.gyro_z,
+        minute: minute,
+        second: second,
+    }
+}
+
 pub(crate) fn write_serial_to_file(mut port: Box<dyn SerialPort + Send>, file_path: String) {
     thread::spawn(move || {
         let mut serial_buf: Vec<u8> = vec![0; 1024];
@@ -299,6 +355,7 @@ pub fn start_data_parser(app_handle: tauri::AppHandle, serial_connection: State<
             let mut port_clone = port.try_clone().map_err(|e| e.to_string())?;  // Add mut here
             let buffer = Arc::new(Mutex::new(TelemetryBuffer::new(10, 10.0)));
             let app_handle = Arc::new(app_handle);
+            let packet_counter = Arc::new(Mutex::new(0u32));
 
             thread::spawn(move || {
                 let mut serial_buf: Vec<u8> = vec![0; 1024];
@@ -331,8 +388,13 @@ pub fn start_data_parser(app_handle: tauri::AppHandle, serial_connection: State<
                                             if let Some(telemetry) = parse_telemetry(&current_message, rssi, snr) {
                                                 if let Ok(mut buffer) = buffer.lock() {
                                                     if let Some(averaged_data) = buffer.add_data(telemetry) {
-                                                        // Now emit should work with the Emitter trait in scope
-                                                        let _ = app_handle.emit("telemetry-update", averaged_data);
+                                                        let mut counter = packet_counter.lock().unwrap();
+                                                        *counter += 1;
+                                                        let packet = convert_to_packet(&averaged_data, *counter);
+                                                        
+                                                        // Emit both events to match simulator behavior
+                                                        let _ = app_handle.emit("telemetry-packet", packet.clone());
+                                                        let _ = app_handle.emit("telemetry-update", packet);
                                                     }
                                                 }
                                             }
