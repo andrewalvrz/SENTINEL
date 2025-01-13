@@ -80,6 +80,22 @@ export const useSerialPorts = (setConsoleArray) => {
     };
 };
 
+export const useDataParser = (setConsoleArray) => {
+    const startDataParsing = async () => {
+        try {
+            setConsoleArray(prev => [...prev, "Starting data parser..."]);
+            await invoke('start_data_parser');
+            setConsoleArray(prev => [...prev, "Data parser started successfully"]);
+            return { success: true };
+        } catch (error) {
+            setConsoleArray(prev => [...prev, `Failed to start data parser: ${error}`]);
+            return { success: false, error };
+        }
+    };
+
+    return { startDataParsing };
+};
+
 export const useMockDataFlow = (setIsRunning, setConsoleArray, isRunning) => {
     const initializeLaunchSequence = async () => {
         if (isRunning) {
