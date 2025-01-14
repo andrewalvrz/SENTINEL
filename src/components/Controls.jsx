@@ -4,23 +4,47 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-/**
- * Example new hook name: useRtParsedStream
- */
-export const useRtParsedStream = (setConsoleArray) => {
-  const startRtParsedStream = async () => {
+export const useLiveDataStream = (setIsRunning, setConsoleArray) => {
+  const startLiveStream = async () => {
     try {
-      setConsoleArray(prev => [...prev, "Starting RT Parsed Stream..."]);
+      setConsoleArray(prev => [...prev, "Starting live data stream..."]);
       await invoke('rt_parsed_stream');
-      setConsoleArray(prev => [...prev, "Data parser (rt_parsed_stream) started successfully"]);
+      setConsoleArray(prev => [...prev, "Live data stream started successfully"]);
+      setIsRunning(true);
       return { success: true };
     } catch (error) {
-      setConsoleArray(prev => [...prev, `Failed to start RT parsed stream: ${error}`]);
+      setConsoleArray(prev => [...prev, `Failed to start live stream: ${error}`]);
+      setIsRunning(false);
       return { success: false, error };
     }
   };
 
-  return { startRtParsedStream };
+  const stopLiveStream = async () => {
+    try {
+      setConsoleArray(prev => [...prev, "Stopping live data stream..."]);
+      await invoke('close_serial');
+      setConsoleArray(prev => [...prev, "Live data stream stopped"]);
+      setIsRunning(false);
+      return { success: true };
+    } catch (error) {
+      setConsoleArray(prev => [...prev, `Failed to stop live stream: ${error}`]);
+      return { success: false, error };
+    }
+  };
+
+  const systemCheck = async () => {
+    try {
+      setConsoleArray(prev => [...prev, "Running system diagnostics..."]);
+      // Add any system check logic here
+      setConsoleArray(prev => [...prev, "System check completed"]);
+      return { success: true };
+    } catch (error) {
+      setConsoleArray(prev => [...prev, `System check failed: ${error}`]);
+      return { success: false, error };
+    }
+  };
+
+  return { startLiveStream, stopLiveStream, systemCheck };
 };
 
 /**

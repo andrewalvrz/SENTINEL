@@ -2,14 +2,15 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from "../../src/utils";
 import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
-import { useSerialPorts } from './Controls';
+import { useSerialPorts, useLiveDataStream } from './Controls';
 
-function Sidebar({ isRunning, setIsRunning }) {
+function Sidebar({ isRunning, latestPacket, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
     const mWidth = useMotionValue(window.innerWidth / 4.5);
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
-    const { ports, selectedPort, setSelectedPort, refreshPorts, openPort, closePort, parsedData } = useSerialPorts(setConsoleArray);
+    const { ports, selectedPort, setSelectedPort, refreshPorts, openPort, closePort } = useSerialPorts(setConsoleArray);
+    const { startLiveStream, stopLiveStream, systemCheck } = useLiveDataStream(setIsRunning, setConsoleArray);
 
     const tabContentVariants = {
         enter: { x: 20, opacity: 0 },
@@ -41,6 +42,23 @@ function Sidebar({ isRunning, setIsRunning }) {
         window.addEventListener("resize", updateWidthAndHeight);
         return () => window.removeEventListener("resize", updateWidthAndHeight);
     }, []);
+
+    const handleStartStream = async () => {
+        if (isRunning) {
+            setConsoleArray(prev => [...prev, "Stream already running..."]);
+            return;
+        }
+        
+        const openResult = await openPort();
+        if (openResult.success) {
+            await startLiveStream();
+        }
+    };
+
+    const handleStopStream = async () => {
+        await stopLiveStream();
+        await closePort();
+    };
 
     return (
         <motion.div
@@ -138,34 +156,89 @@ function Sidebar({ isRunning, setIsRunning }) {
 
                                 <div className="flex flex-row gap-2">
                                     <button 
-                                        onClick={openPort}
-                                        disabled={!selectedPort}
+                                        onClick={handleStartStream}
+                                        disabled={!selectedPort || isRunning}
                                         className={cn(
                                             "flex-1 py-2 px-4",
-                                            selectedPort 
+                                            selectedPort && !isRunning
                                                 ? "bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF]" 
                                                 : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
                                         )}
                                     >
-                                        Open Serial
+                                        Start Stream
                                     </button>
                                     <button 
-                                        onClick={closePort}
-                                        disabled={!selectedPort}
+                                        onClick={handleStopStream}
+                                        disabled={!isRunning}
                                         className={cn(
                                             "flex-1 py-2 px-4",
-                                            selectedPort 
+                                            isRunning
                                                 ? "bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF]" 
                                                 : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
                                         )}
                                     >
-                                        Close Serial
+                                        Stop Stream
                                     </button>
                                 </div>
+
+                                <button 
+                                    onClick={systemCheck}
+                                    className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
+                                >
+                                    System Check
+                                </button>
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
+            </div>
+
+            <div className='flex flex-col px-4 py-2 text-white gap-1 flex-1'>
+                <h2 className='uppercase text-lg text-[#9CA3AF]'>Live Data</h2>
+                <div className='flex flex-row justify-between'>
+                    <p>Altitude</p>
+                    <p>{latestPacket.altitude?.toFixed(2) || "0.00"} m</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>SNR</p>
+                    <p>{latestPacket.snr?.toFixed(2) || "0.00"} dBm</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Pressure</p>
+                    <p>{latestPacket.pressure?.toFixed(2) || "0.00"} bar</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Acceleration (X Axis)</p>
+                    <p>{latestPacket.acceleration_x?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Acceleration (Y Axis)</p>
+                    <p>{latestPacket.acceleration_y?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Acceleration (Z Axis)</p>
+                    <p>{latestPacket.acceleration_z?.toFixed(2) || "0.00"} m/s<sup>2</sup></p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Velocity (X Axis)</p>
+                    <p>{latestPacket.velocity_x?.toFixed(2) || "0.00"} m/s</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Velocity (Y Axis)</p>
+                    <p>{latestPacket.velocity_y?.toFixed(2) || "0.00"} m/s</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Velocity (Z Axis)</p>
+                    <p>{latestPacket.velocity_z?.toFixed(2) || "0.00"} m/s</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Longitude</p>
+                    <p>{latestPacket.longitude?.toFixed(7) || "0.00"}</p>
+                </div>
+                <div className='flex flex-row justify-between'>
+                    <p>Latitude</p>
+                    <p>{latestPacket.latitude?.toFixed(7) || "0.00"}</p>
+                </div>
             </div>
 
             <img src={Logo} width={64} height={64} className='absolute bottom-[10px] right-[10px]' />
