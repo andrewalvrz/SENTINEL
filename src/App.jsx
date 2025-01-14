@@ -15,6 +15,31 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [packetReceived, setPacketReceived] = useState(false);
 
+  const handleSystemReset = () => {
+    setPackets([]);
+    setLatestPacket({
+      mission_time: "0",
+      satellites: 0,
+      connected: false,
+      rssi: 0,
+      battery: 0,
+      latitude: 0,
+      longitude: 0,
+      altitude: 0,
+      velocity_x: 0,
+      velocity_y: 0,
+      velocity_z: 0,
+      acceleration_x: 0,
+      acceleration_y: 0,
+      acceleration_z: 0,
+      pitch: 0,
+      yaw: 0,
+      roll: 0,
+      minute: 0,
+      second: 0
+    });
+  };
+
   useEffect(() => {
     const unlisten = [];
 
@@ -119,6 +144,7 @@ function App() {
           isRunning={isRunning} 
           latestPacket={latestPacket}
           setIsRunning={setIsRunning}
+          onSystemReset={handleSystemReset}
         />
       </div>
     </main>

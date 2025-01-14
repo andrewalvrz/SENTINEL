@@ -4,7 +4,7 @@ import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
 import { useSerialPorts, useLiveDataStream } from './Controls';
 
-function Sidebar({ isRunning, latestPacket, setIsRunning }) {
+function Sidebar({ isRunning, latestPacket, setIsRunning, onSystemReset }) {
     const [activeTab, setActiveTab] = useState("console");
     const mWidth = useMotionValue(window.innerWidth / 4.5);
     const [consoleArray, setConsoleArray] = useState([]);
@@ -182,10 +182,16 @@ function Sidebar({ isRunning, latestPacket, setIsRunning }) {
                                 </div>
 
                                 <button 
-                                    onClick={systemCheck}
-                                    className="w-full bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF] py-2 px-4"
+                                    onClick={onSystemReset}
+                                    disabled={isRunning}
+                                    className={cn(
+                                        "w-full py-2 px-4",
+                                        isRunning
+                                            ? "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+                                            : "bg-zinc-800 hover:bg-zinc-900 text-[#9CA3AF]"
+                                    )}
                                 >
-                                    System Check
+                                    System Reset
                                 </button>
                             </div>
                         </motion.div>

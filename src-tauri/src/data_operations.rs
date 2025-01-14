@@ -114,12 +114,16 @@ fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
     let time_str = time_parts.get(1).unwrap_or(&"").trim_end_matches('Z');
     let comps: Vec<&str> = time_str.split(':').collect();
 
-    let minute = comps.get(1).unwrap_or(&"0").parse().unwrap_or(0);
-    let second = comps.get(2).unwrap_or(&"0").parse().unwrap_or(0);
+    let hours: u32 = comps.get(0).unwrap_or(&"0").parse().unwrap_or(0);
+    let minutes: u32 = comps.get(1).unwrap_or(&"0").parse().unwrap_or(0);
+    let seconds: u32 = comps.get(2).unwrap_or(&"0").parse().unwrap_or(0);
+
+    // Calculate total seconds elapsed
+    let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
 
     TelemetryPacket {
         id: packet_id,
-        mission_time: data.timestamp.clone(),
+        mission_time: total_seconds.to_string(), // Changed to total seconds
         connected: true,
         satellites: data.gps_satellites,
         rssi: data.rssi,
@@ -136,8 +140,8 @@ fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
         pitch: data.gyro_x,
         yaw: data.gyro_y,
         roll: data.gyro_z,
-        minute,
-        second,
+        minute: minutes,
+        second: seconds,
     }
 }
 
