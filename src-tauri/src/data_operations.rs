@@ -1,5 +1,3 @@
-// src-tauri/src/data_operations.rs
-
 use std::io::Read;
 use std::thread;
 use std::time::Duration;
@@ -143,20 +141,20 @@ fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
     }
 }
 
-/// **Renamed** function (was `start_data_parser`) to `rt_parsed_stream`.
 /// Spawns a background thread that reads from the currently open serial port,
-/// parses each chunk of data, and emits it to the front end. 
-///
+/// parses each chunk of data, and emits it to the front end.
+/// 
 /// **Important**: The thread automatically stops when `close_serial` is invoked,
-/// since that sets the shared `SerialConnection` to `None`, causing read errors.
+/// because that sets the shared `stop_flag`, and we check it each loop iteration.
 #[tauri::command]
 pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, SerialConnection>) -> Result<(), String> {
-    let connection = serial_connection.0.lock().unwrap();
+    let connection = serial_connection.port.lock().unwrap();
     let mut port = match connection.as_ref() {
         Some(port) => port.try_clone().map_err(|e| e.to_string())?,
         None => return Err("No active serial connection".to_string()),
     };
 
+    let stop_flag = serial_connection.stop_flag.clone();
     let packet_counter = Arc::new(Mutex::new(0u32));
 
     thread::spawn(move || {
@@ -167,6 +165,12 @@ pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, Seri
         let mut current_snr: Option<f32> = None;
 
         loop {
+            // Check if we've been asked to stop
+            if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!("rt_parsed_stream: stop_flag detected, exiting thread.");
+                break;
+            }
+
             match port.read(&mut serial_buf) {
                 Ok(n) if n > 0 => {
                     accumulated_data.push_str(&String::from_utf8_lossy(&serial_buf[..n]));
@@ -193,7 +197,7 @@ pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, Seri
                                     *count += 1;
                                     let packet = convert_to_packet(&parsed, *count);
 
-                                    // Emitting two events (mimic original usage)
+                                    // Emitting two events for demonstration
                                     let _ = app_handle.emit("telemetry-packet", packet.clone());
                                     let _ = app_handle.emit("telemetry-update", packet);
                                 }
