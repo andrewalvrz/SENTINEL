@@ -115,27 +115,3 @@ export const useSerialPorts = (setConsoleArray) => {
   };
 };
 
-/**
- * Example usage for the simulator function (unchanged):
- */
-export const useMockDataFlow = (setIsRunning, setConsoleArray, isRunning) => {
-  const initializeLaunchSequence = async () => {
-    if (isRunning) {
-      setConsoleArray(prev => [...prev, "Launch sequence already running..."]);
-      return false;
-    }
-    try {
-      setConsoleArray(prev => [...prev, "Initializing launch sequence..."]);
-      await invoke('stream_telemetry');
-      setIsRunning(true);
-      setConsoleArray(prev => [...prev, "Launch sequence started successfully"]);
-      return true;
-    } catch (error) {
-      setConsoleArray(prev => [...prev, `Launch sequence failed: ${error}`]);
-      setIsRunning(false);
-      return false;
-    }
-  };
-
-  return { initializeLaunchSequence };
-};
