@@ -9,7 +9,7 @@ function Sidebar({ isRunning, latestPacket, setIsRunning, onSystemReset }) {
     const mWidth = useMotionValue(window.innerWidth / 4.5);
     const [consoleArray, setConsoleArray] = useState([]);
     const initialized = useRef(false);
-    const { ports, selectedPort, setSelectedPort, refreshPorts, openPort, closePort } = useSerialPorts(setConsoleArray);
+    const { ports, selectedPort, setSelectedPort, refreshPorts, openPort, closePort } = useSerialPorts(setConsoleArray, isRunning);
     const { startLiveStream, stopLiveStream, systemCheck } = useLiveDataStream(setIsRunning, setConsoleArray);
 
     const tabContentVariants = {

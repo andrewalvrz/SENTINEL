@@ -52,11 +52,10 @@ export const useLiveDataStream = (setIsRunning, setConsoleArray) => {
  * Notice that we no longer call `start_data_parser` anywhere below,
  * but `rt_parsed_stream` instead if we want to start parsing.
  */
-export const useSerialPorts = (setConsoleArray) => {
+export const useSerialPorts = (setConsoleArray, isRunning) => {
   const [ports, setPorts] = useState([]);
   const [parsedData, setParsedData] = useState(null);
   const [selectedPort, setSelectedPort] = useState('');
-  const isInitialized = useRef(false);
 
   useEffect(() => {
     const unlisten = listen('telemetry-update', (event) => {
@@ -68,8 +67,10 @@ export const useSerialPorts = (setConsoleArray) => {
   }, []);
 
   const refreshPorts = useCallback(async () => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
+    if (isRunning) {
+      setConsoleArray(prev => [...prev, "Cannot refresh ports while system is running"]);
+      return { success: false, error: "System is running" };
+    }
     
     setConsoleArray(prev => [...prev, "Refreshing available ports..."]);
     try {
@@ -85,7 +86,7 @@ export const useSerialPorts = (setConsoleArray) => {
       setPorts([]);
       return { success: false, error };
     }
-  }, [setConsoleArray, selectedPort]);
+  }, [setConsoleArray, selectedPort, isRunning]);
 
   /**
    * Instead of calling 'open_serial' then 'start_data_parser', 
