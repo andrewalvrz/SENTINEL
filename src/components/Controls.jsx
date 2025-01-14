@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Example new hook name: useRtParsedStream
@@ -32,6 +32,7 @@ export const useSerialPorts = (setConsoleArray) => {
   const [ports, setPorts] = useState([]);
   const [parsedData, setParsedData] = useState(null);
   const [selectedPort, setSelectedPort] = useState('');
+  const isInitialized = useRef(false);
 
   useEffect(() => {
     const unlisten = listen('telemetry-update', (event) => {
@@ -42,7 +43,10 @@ export const useSerialPorts = (setConsoleArray) => {
     };
   }, []);
 
-  const refreshPorts = async () => {
+  const refreshPorts = useCallback(async () => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+    
     setConsoleArray(prev => [...prev, "Refreshing available ports..."]);
     try {
       const ports = await invoke('list_serial_ports');
@@ -57,7 +61,7 @@ export const useSerialPorts = (setConsoleArray) => {
       setPorts([]);
       return { success: false, error };
     }
-  };
+  }, [setConsoleArray, selectedPort]);
 
   /**
    * Instead of calling 'open_serial' then 'start_data_parser', 
@@ -99,16 +103,11 @@ export const useSerialPorts = (setConsoleArray) => {
     }
   };
 
-  useEffect(() => {
-    refreshPorts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return { 
     ports,
     selectedPort,
     setSelectedPort,
-    refreshPorts,
+    refreshPorts,  // Now this needs to be called manually once
     openPort,
     closePort,
     parsedData
