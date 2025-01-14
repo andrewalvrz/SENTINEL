@@ -18,7 +18,6 @@ pub fn run() {
             serial_operations::close_serial,
             file_operations::create_text_file,
             file_operations::list_files,
-            data_operations::start_recording,
             data_operations::start_data_parser, 
             telemetry_sim::stream_telemetry
         ])
