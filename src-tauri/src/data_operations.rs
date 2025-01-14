@@ -19,23 +19,23 @@ pub struct TelemetryData {
     pub gyro_x: f32,
     pub gyro_y: f32,
     pub gyro_z: f32,
-    pub imu_temp: f32,       
-    pub bme_temp: f32,        
-    pub bme_pressure: f32,   
-    pub bme_altitude: f32,    
-    pub bme_humidity: f32,    
+    pub imu_temp: f32,
+    pub bme_temp: f32,
+    pub bme_pressure: f32,
+    pub bme_altitude: f32,
+    pub bme_humidity: f32,
     pub gps_fix: u8,
-    pub gps_fix_quality: u8,  
-    pub gps_lat: f32,         
-    pub gps_lon: f32,        
-    pub gps_speed: f32,      
-    pub gps_altitude: f32,    
-    pub gps_satellites: u8,   
+    pub gps_fix_quality: u8,
+    pub gps_lat: f32,
+    pub gps_lon: f32,
+    pub gps_speed: f32,
+    pub gps_altitude: f32,
+    pub gps_satellites: u8,
     pub rssi: i32,
     pub snr: f32,
 }
 
-/// This is what the front-end ultimately receives via event emission
+/// This is what the front end ultimately receives via event emission
 #[derive(Debug, Serialize, Clone)]
 pub struct TelemetryPacket {
     pub id: u32,
@@ -61,35 +61,25 @@ pub struct TelemetryPacket {
 }
 
 /// Parse a single, complete telemetry message into our `TelemetryData` struct.
-/// Expects input lines of the form:
-///   [YYYY/MM/DD (Day) HH:MM:SS] ACCX,ACCY,ACCZ,GYRX, ...
-/// plus "RSSI: " and "Snr: " lines afterward to complete the info.
 fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> {
-    // Example raw lines might look like:
-    // [2024/12/22 (Sunday) 15:34:09] 0.01,0.02,0.03, ...
-    // We'll split once at "] "
     let parts: Vec<&str> = message.split("] ").collect();
     if parts.len() != 2 {
         return None;
     }
 
-    // The timestamp is bracketed like [2024/12/22 (Sunday) 15:34:09
+    // Example: [2024/12/22 (Sunday) 15:34:09]
     let raw_timestamp = parts[0].trim_start_matches('[');
-    // Inline parse of that date/time
-    //   e.g. "2024/12/22 (Sunday) 15:34:09"
-    // We'll split by space and assume we have at least 3 segments
     let ts_parts: Vec<&str> = raw_timestamp.split(' ').collect();
     if ts_parts.len() < 3 {
         return None;
     }
-    let date = ts_parts[0].replace("/", "-"); // Turn "YYYY/MM/DD" into "YYYY-MM-DD"
-    let time = ts_parts[2];                  // "HH:MM:SS"
+    let date = ts_parts[0].replace("/", "-"); // e.g. "YYYY-MM-DD"
+    let time = ts_parts[2];                  // e.g. "HH:MM:SS"
     let iso_timestamp = format!("{}T{}Z", date, time);
 
-    // The numeric data is after the bracket, in `parts[1]`
+    // The numeric data is after the bracket
     let data_str = parts[1];
     let values: Vec<&str> = data_str.split(',').collect();
-    // Expect 18 numeric fields after we strip "RSSI" / "Snr"
     if values.len() != 18 {
         return None;
     }
@@ -119,12 +109,11 @@ fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> 
     })
 }
 
-/// Convert raw `TelemetryData` into the final `TelemetryPacket` we send to the front-end.
+/// Convert raw `TelemetryData` into the final `TelemetryPacket` structure.
 fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
-    // Extract minute and second from data.timestamp (which should be "YYYY-MM-DDTHH:MM:SSZ")
+    // Extract minute and second from data.timestamp (e.g. "YYYY-MM-DDTHH:MM:SSZ")
     let time_parts: Vec<&str> = data.timestamp.split('T').collect();
-    let time_str = time_parts.get(1).unwrap_or(&""); // e.g. "HH:MM:SSZ"
-    let time_str = time_str.trim_end_matches('Z');
+    let time_str = time_parts.get(1).unwrap_or(&"").trim_end_matches('Z');
     let comps: Vec<&str> = time_str.split(':').collect();
 
     let minute = comps.get(1).unwrap_or(&"0").parse().unwrap_or(0);
@@ -136,11 +125,10 @@ fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
         connected: true,
         satellites: data.gps_satellites,
         rssi: data.rssi,
-        battery: 100.0, // You can add actual battery logic if available
+        battery: 100.0, // placeholder battery value
         latitude: data.gps_lat as f64,
         longitude: data.gps_lon as f64,
         altitude: data.gps_altitude,
-        // Here, for demonstration, we're reusing "gyro" fields as velocity or orientation
         velocity_x: data.gyro_x,
         velocity_y: data.gyro_y,
         velocity_z: data.gyro_z,
@@ -155,11 +143,14 @@ fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
     }
 }
 
-/// Main Tauri command to start reading from an open serial connection.
-/// It looks for lines prefixed with "Message: ", "RSSI: ", and "Snr: " and
-/// emits each valid parsed packet to the front end.
+/// **Renamed** function (was `start_data_parser`) to `rt_parsed_stream`.
+/// Spawns a background thread that reads from the currently open serial port,
+/// parses each chunk of data, and emits it to the front end. 
+///
+/// **Important**: The thread automatically stops when `close_serial` is invoked,
+/// since that sets the shared `SerialConnection` to `None`, causing read errors.
 #[tauri::command]
-pub fn start_data_parser(app_handle: AppHandle, serial_connection: State<'_, SerialConnection>) -> Result<(), String> {
+pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, SerialConnection>) -> Result<(), String> {
     let connection = serial_connection.0.lock().unwrap();
     let mut port = match connection.as_ref() {
         Some(port) => port.try_clone().map_err(|e| e.to_string())?,
@@ -195,19 +186,19 @@ pub fn start_data_parser(app_handle: AppHandle, serial_connection: State<'_, Ser
                                 current_snr = Some(snr_val);
                             }
 
-                            // If we have rssi and snr, we can parse the full message
+                            // If we have rssi and snr, try to parse the full message
                             if let (Some(rssi), Some(snr)) = (current_rssi, current_snr) {
                                 if let Some(parsed) = parse_telemetry(&current_message, rssi, snr) {
                                     let mut count = packet_counter.lock().unwrap();
                                     *count += 1;
                                     let packet = convert_to_packet(&parsed, *count);
 
-                                    // Emitting two events to mimic original usage
+                                    // Emitting two events (mimic original usage)
                                     let _ = app_handle.emit("telemetry-packet", packet.clone());
                                     let _ = app_handle.emit("telemetry-update", packet);
                                 }
 
-                                // Reset for the next message
+                                // Reset after consuming the message
                                 current_message.clear();
                                 current_rssi = None;
                                 current_snr = None;
@@ -218,7 +209,7 @@ pub fn start_data_parser(app_handle: AppHandle, serial_connection: State<'_, Ser
                     }
                 }
                 Ok(_) => {
-                    // no data read this time; just wait and try again
+                    // No data read this time; just wait and try again
                     thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
@@ -227,7 +218,7 @@ pub fn start_data_parser(app_handle: AppHandle, serial_connection: State<'_, Ser
                         thread::sleep(Duration::from_millis(100));
                         continue;
                     }
-                    eprintln!("Critical error reading from port: {}", e);
+                    eprintln!("Terminating rt_parsed_stream thread: {}", e);
                     break;
                 }
             }

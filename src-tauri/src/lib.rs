@@ -18,8 +18,8 @@ pub fn run() {
             serial_operations::close_serial,
             file_operations::create_text_file,
             file_operations::list_files,
-            data_operations::start_data_parser, 
-            telemetry_sim::stream_telemetry
+            telemetry_sim::stream_telemetry,
+            data_operations::rt_parsed_stream 
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from "../../src/utils";
 import { motion, useMotionValue, AnimatePresence } from "framer-motion";
 import Logo from "../assets/Logo.png";
-import { useMockDataFlow, useSerialPorts, useDataParser } from './Controls';
+import { useMockDataFlow, useSerialPorts, useRtParsedStream } from './Controls';
 
 function Sidebar({ isRunning, setIsRunning }) {
     const [activeTab, setActiveTab] = useState("console");
@@ -12,7 +12,7 @@ function Sidebar({ isRunning, setIsRunning }) {
     const [showParsedData, setShowParsedData] = useState(false);
     const { initializeLaunchSequence } = useMockDataFlow(setIsRunning, setConsoleArray, isRunning);
     const { ports, selectedPort, setSelectedPort, refreshPorts, openPort, closePort, parsedData } = useSerialPorts(setConsoleArray);
-    const { startDataParsing } = useDataParser(setConsoleArray);
+    const { startRtParsedStream } = useRtParsedStream(setConsoleArray);
 
     // Animation variants
     const tabContentVariants = {
@@ -220,7 +220,7 @@ function Sidebar({ isRunning, setIsRunning }) {
                                 </div>
 
                                 <button 
-                                    onClick={startDataParsing}
+                                    onClick={startRtParsedStream}
                                     disabled={!selectedPort}
                                     className={cn(
                                         "w-full py-2 px-4",
