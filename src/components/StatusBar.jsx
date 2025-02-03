@@ -1,13 +1,19 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Satellite, BatteryFull, SignalHigh } from 'lucide-react';
 import { cn } from "../utils";
 
 function StatusBar({ missionTime, satellites, connected, RSSI, battery }) {
+    const [showConsoleOutput, setShowConsoleOutput] = useState(false);
 
     function secondsToHHMMSS(seconds) {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = Math.floor(seconds % 60);
+        // Parse the input to number if it's a string
+        const totalSeconds = typeof seconds === 'string' ? parseInt(seconds, 10) : seconds;
+        
+        if (isNaN(totalSeconds)) return '00:00:00';
+        
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const secs = Math.floor(totalSeconds % 60);
     
         return [
             hours.toString().padStart(2, '0'),
@@ -55,7 +61,6 @@ function StatusBar({ missionTime, satellites, connected, RSSI, battery }) {
                     <BatteryFull size={18} />
                 </div>
             </div>
-
         </div>
     )
 }

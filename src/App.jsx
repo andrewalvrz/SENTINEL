@@ -1,4 +1,3 @@
-//App.jsx
 import "./App.css";
 import StatusBar from "./components/StatusBar";
 import Sidebar from "./components/Sidebar";
@@ -16,23 +15,58 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [packetReceived, setPacketReceived] = useState(false);
 
+  const handleSystemReset = () => {
+    setPackets([]);
+    setLatestPacket({
+      mission_time: "0",
+      satellites: 0,
+      connected: false,
+      rssi: 0,
+      battery: 0,
+      latitude: 0,
+      longitude: 0,
+      altitude: 0,
+      velocity_x: 0,
+      velocity_y: 0,
+      velocity_z: 0,
+      acceleration_x: 0,
+      acceleration_y: 0,
+      acceleration_z: 0,
+      pitch: 0,
+      yaw: 0,
+      roll: 0,
+      minute: 0,
+      second: 0
+    });
+  };
+
   useEffect(() => {
-    const unlisten = [];    // Array to store unlisten functions
+    const unlisten = [];
 
     async function setupListeners() {
+      // Listen for telemetry packets
       unlisten.push(
-        await listen('telemetry-packet', event => {   // Listen for telemetry-packet events
-          setPackets(prev => [...prev, event.payload]); // Add packet to packets array
-          setLatestPacket(event.payload);            // Update latest packet
-          setPacketReceived(true);               // Set packet received to true
-          setIsRunning(true);              // Set isRunning to true
-        }),
-        await listen('telemetry-complete', () => setIsRunning(false)) // Stop when backend emits telemetry-complete event
+        await listen('telemetry-packet', event => {
+          setPackets(prev => [...prev, event.payload]);
+          setLatestPacket(event.payload);
+          setPacketReceived(true);
+          setIsRunning(true);
+        })
+      );
+
+      // Optional: Listen for connection status changes
+      unlisten.push(
+        await listen('serial-disconnected', () => {
+          setIsRunning(false);
+          // Optionally clear or preserve existing data
+          // setPackets([]);
+          // setLatestPacket({});
+        })
       );
     }
 
     setupListeners();
-    return () => unlisten.forEach(fn => fn());  // Unlisten when component unmounts (cleanup)
+    return () => unlisten.forEach(fn => fn());
   }, []);
 
   return (
@@ -110,6 +144,7 @@ function App() {
           isRunning={isRunning} 
           latestPacket={latestPacket}
           setIsRunning={setIsRunning}
+          onSystemReset={handleSystemReset}
         />
       </div>
     </main>

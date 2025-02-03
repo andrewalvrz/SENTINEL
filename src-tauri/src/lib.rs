@@ -1,21 +1,25 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+mod serial_operations;
+mod data_operations;
+mod file_operations;
 mod telemetry_sim;
-mod serial;
 
-use serial::SerialPortState;
-use std::sync::Mutex;
+use serial_operations::SerialConnection; // Updated import
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(SerialPortState(Mutex::new(None)))
+        // Instead of creating a raw Mutex(None), call the new() constructor:
+        .manage(SerialConnection::new())
         .invoke_handler(tauri::generate_handler![
-            telemetry_sim::mockdata,
+            serial_operations::list_serial_ports,
+            serial_operations::open_serial,
+            serial_operations::close_serial,
+            file_operations::create_text_file,
+            file_operations::list_files,
             telemetry_sim::stream_telemetry,
-            serial::list_ports,
-            serial::open_port,
-            serial::close_port
+            data_operations::rt_parsed_stream 
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
