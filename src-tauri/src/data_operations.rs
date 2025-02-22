@@ -139,7 +139,7 @@ pub fn rt_parsed_stream<R: Runtime>(
 ) -> Result<(), String> {
     let packet_counter = Arc::new(Mutex::new(0u32));
     let app_handle_clone = app_handle.clone();
-    let serial = app_handle.state::<tauri_plugin_serialplugin::desktop_api::SerialPort<R>>();
+    let serial = app_handle.state::<tauri_plugin_serialplugin::SerialPort<R>>();
 
     // Start listening on the port
     serial
@@ -175,7 +175,7 @@ pub fn rt_parsed_stream<R: Runtime>(
                 }
 
                 if let (Some(rssi), Some(snr)) = (current_rssi, current_snr) {
-                    if let Some(parsed) = parse_telemetry(&current_message, rssi, snr) {
+                    if let Some(parsed) = parse_telemetry(&current_message, rssi, snr) { // Fixed typo
                         let mut count = packet_counter.lock().unwrap();
                         *count += 1;
                         let packet = convert_to_packet(&parsed, *count);
