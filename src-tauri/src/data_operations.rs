@@ -1,13 +1,7 @@
-use std::io::Read;
-use std::thread;
-use std::time::Duration;
 use std::sync::{Arc, Mutex};
-use tauri::{State, AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Listener, Manager, Runtime};
 use serde::Serialize;
 
-use crate::serial_operations::SerialConnection;
-
-/// Basic telemetry structure parsed from raw messages
 #[derive(Debug, Serialize, Clone)]
 pub struct TelemetryData {
     pub timestamp: String,
@@ -33,7 +27,6 @@ pub struct TelemetryData {
     pub snr: f32,
 }
 
-/// This is what the front end ultimately receives via event emission
 #[derive(Debug, Serialize, Clone)]
 pub struct TelemetryPacket {
     pub id: u32,
@@ -58,24 +51,21 @@ pub struct TelemetryPacket {
     pub second: u32,
 }
 
-/// Parse a single, complete telemetry message into our `TelemetryData` struct.
 fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> {
     let parts: Vec<&str> = message.split("] ").collect();
     if parts.len() != 2 {
         return None;
     }
 
-    // Example: [2024/12/22 (Sunday) 15:34:09]
     let raw_timestamp = parts[0].trim_start_matches('[');
     let ts_parts: Vec<&str> = raw_timestamp.split(' ').collect();
     if ts_parts.len() < 3 {
         return None;
     }
-    let date = ts_parts[0].replace("/", "-"); // e.g. "YYYY-MM-DD"
-    let time = ts_parts[2];                  // e.g. "HH:MM:SS"
+    let date = ts_parts[0].replace("/", "-");
+    let time = ts_parts[2];
     let iso_timestamp = format!("{}T{}Z", date, time);
 
-    // The numeric data is after the bracket
     let data_str = parts[1];
     let values: Vec<&str> = data_str.split(',').collect();
     if values.len() != 18 {
@@ -107,9 +97,7 @@ fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> 
     })
 }
 
-/// Convert raw `TelemetryData` into the final `TelemetryPacket` structure.
 fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
-    // Extract minute and second from data.timestamp (e.g. "YYYY-MM-DDTHH:MM:SSZ")
     let time_parts: Vec<&str> = data.timestamp.split('T').collect();
     let time_str = time_parts.get(1).unwrap_or(&"").trim_end_matches('Z');
     let comps: Vec<&str> = time_str.split(':').collect();
@@ -118,16 +106,15 @@ fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
     let minutes: u32 = comps.get(1).unwrap_or(&"0").parse().unwrap_or(0);
     let seconds: u32 = comps.get(2).unwrap_or(&"0").parse().unwrap_or(0);
 
-    // Calculate total seconds elapsed
     let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
 
     TelemetryPacket {
         id: packet_id,
-        mission_time: total_seconds.to_string(), // Changed to total seconds
+        mission_time: total_seconds.to_string(),
         connected: true,
         satellites: data.gps_satellites,
         rssi: data.rssi,
-        battery: 100.0, // placeholder battery value
+        battery: 100.0,
         latitude: data.gps_lat as f64,
         longitude: data.gps_lon as f64,
         altitude: data.gps_altitude,
@@ -145,91 +132,65 @@ fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
     }
 }
 
-/// Spawns a background thread that reads from the currently open serial port,
-/// parses each chunk of data, and emits it to the front end.
-/// 
-/// **Important**: The thread automatically stops when `close_serial` is invoked,
-/// because that sets the shared `stop_flag`, and we check it each loop iteration.
 #[tauri::command]
-pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, SerialConnection>) -> Result<(), String> {
-    let connection = serial_connection.port.lock().unwrap();
-    let mut port = match connection.as_ref() {
-        Some(port) => port.try_clone().map_err(|e| e.to_string())?,
-        None => return Err("No active serial connection".to_string()),
-    };
-
-    let stop_flag = serial_connection.stop_flag.clone();
+pub fn rt_parsed_stream<R: Runtime>(
+    app_handle: AppHandle<R>,
+    port_name: String,
+) -> Result<(), String> {
     let packet_counter = Arc::new(Mutex::new(0u32));
+    let app_handle_clone = app_handle.clone();
+    let serial = app_handle.state::<tauri_plugin_serialplugin::SerialPort<R>>();
 
-    thread::spawn(move || {
-        let mut serial_buf = vec![0u8; 1024];
+    // Start listening on the port
+    serial
+        .start_listening(port_name.clone(), Some(100), Some(1024))
+        .map_err(|e| e.to_string())?;
+
+    // Register an event listener for incoming data
+    let event_name = format!(
+        "plugin-serialplugin-read-{}",
+        port_name.replace(".", "-").replace("/", "-")
+    );
+    app_handle.listen(event_name, move |event| {
+        let payload = event.payload(); // payload is &str
         let mut accumulated_data = String::new();
         let mut current_message = String::new();
         let mut current_rssi: Option<i32> = None;
         let mut current_snr: Option<f32> = None;
 
-        loop {
-            // Check if we've been asked to stop
-            if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
-                eprintln!("rt_parsed_stream: stop_flag detected, exiting thread.");
-                break;
+        accumulated_data.push_str(payload);
+
+        while let Some(pos) = accumulated_data.find("\r\n") {
+            let line = accumulated_data[..pos].trim();
+
+            if line.starts_with("Message: ") {
+                current_message = line["Message: ".len()..].to_string();
+            } else if line.starts_with("RSSI: ") {
+                if let Ok(rssi_val) = line["RSSI: ".len()..].trim().parse() {
+                    current_rssi = Some(rssi_val);
+                }
+            } else if line.starts_with("Snr: ") {
+                if let Ok(snr_val) = line["Snr: ".len()..].trim().parse() {
+                    current_snr = Some(snr_val);
+                }
+
+                if let (Some(rssi), Some(snr)) = (current_rssi, current_snr) {
+                    if let Some(parsed) = parse_telemetry(&current_message, rssi, snr) { // Fixed typo
+                        let mut count = packet_counter.lock().unwrap();
+                        *count += 1;
+                        let packet = convert_to_packet(&parsed, *count);
+
+                        let _ = app_handle_clone.emit("telemetry-packet", packet.clone());
+                        let _ = app_handle_clone.emit("telemetry-update", packet);
+                    }
+
+                    current_message.clear();
+                    current_rssi = None;
+                    current_snr = None;
+                }
             }
 
-            match port.read(&mut serial_buf) {
-                Ok(n) if n > 0 => {
-                    accumulated_data.push_str(&String::from_utf8_lossy(&serial_buf[..n]));
-
-                    // Process lines ending with "\r\n"
-                    while let Some(pos) = accumulated_data.find("\r\n") {
-                        let line = accumulated_data[..pos].trim();
-
-                        if line.starts_with("Message: ") {
-                            current_message = line["Message: ".len()..].to_string();
-                        } else if line.starts_with("RSSI: ") {
-                            if let Ok(rssi_val) = line["RSSI: ".len()..].trim().parse() {
-                                current_rssi = Some(rssi_val);
-                            }
-                        } else if line.starts_with("Snr: ") {
-                            if let Ok(snr_val) = line["Snr: ".len()..].trim().parse() {
-                                current_snr = Some(snr_val);
-                            }
-
-                            // If we have rssi and snr, try to parse the full message
-                            if let (Some(rssi), Some(snr)) = (current_rssi, current_snr) {
-                                if let Some(parsed) = parse_telemetry(&current_message, rssi, snr) {
-                                    let mut count = packet_counter.lock().unwrap();
-                                    *count += 1;
-                                    let packet = convert_to_packet(&parsed, *count);
-
-                                    // Emitting two events for demonstration
-                                    let _ = app_handle.emit("telemetry-packet", packet.clone());
-                                    let _ = app_handle.emit("telemetry-update", packet);
-                                }
-
-                                // Reset after consuming the message
-                                current_message.clear();
-                                current_rssi = None;
-                                current_snr = None;
-                            }
-                        }
-
-                        accumulated_data = accumulated_data[pos + 2..].to_string();
-                    }
-                }
-                Ok(_) => {
-                    // No data read this time; just wait and try again
-                    thread::sleep(Duration::from_millis(100));
-                }
-                Err(e) => {
-                    // Timed out or critical error
-                    if e.kind() == std::io::ErrorKind::TimedOut {
-                        thread::sleep(Duration::from_millis(100));
-                        continue;
-                    }
-                    eprintln!("Terminating rt_parsed_stream thread: {}", e);
-                    break;
-                }
-            }
+            accumulated_data = accumulated_data[pos + 2..].to_string();
         }
     });
 
