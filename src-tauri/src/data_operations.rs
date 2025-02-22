@@ -51,6 +51,7 @@ pub struct TelemetryPacket {
     pub second: u32,
 }
 
+// Original parse_telemetry function (outside test module)
 fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> {
     let parts: Vec<&str> = message.split("] ").collect();
     if parts.len() != 2 {
@@ -59,11 +60,11 @@ fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> 
 
     let raw_timestamp = parts[0].trim_start_matches('[');
     let ts_parts: Vec<&str> = raw_timestamp.split(' ').collect();
-    if ts_parts.len() < 3 {
+    if ts_parts.len() != 2 { // Adjusted for [YYYY-MM-DD HH:MM:SS]
         return None;
     }
     let date = ts_parts[0].replace("/", "-");
-    let time = ts_parts[2];
+    let time = ts_parts[1];
     let iso_timestamp = format!("{}T{}Z", date, time);
 
     let data_str = parts[1];
@@ -141,18 +142,16 @@ pub fn rt_parsed_stream<R: Runtime>(
     let app_handle_clone = app_handle.clone();
     let serial = app_handle.state::<tauri_plugin_serialplugin::SerialPort<R>>();
 
-    // Start listening on the port
     serial
         .start_listening(port_name.clone(), Some(100), Some(1024))
         .map_err(|e| e.to_string())?;
 
-    // Register an event listener for incoming data
     let event_name = format!(
         "plugin-serialplugin-read-{}",
         port_name.replace(".", "-").replace("/", "-")
     );
     app_handle.listen(event_name, move |event| {
-        let payload = event.payload(); // payload is &str
+        let payload = event.payload();
         let mut accumulated_data = String::new();
         let mut current_message = String::new();
         let mut current_rssi: Option<i32> = None;
@@ -175,7 +174,7 @@ pub fn rt_parsed_stream<R: Runtime>(
                 }
 
                 if let (Some(rssi), Some(snr)) = (current_rssi, current_snr) {
-                    if let Some(parsed) = parse_telemetry(&current_message, rssi, snr) { // Fixed typo
+                    if let Some(parsed) = parse_telemetry(&current_message, rssi, snr) {
                         let mut count = packet_counter.lock().unwrap();
                         *count += 1;
                         let packet = convert_to_packet(&parsed, *count);
@@ -195,4 +194,46 @@ pub fn rt_parsed_stream<R: Runtime>(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_telemetry_valid() {
+        let input = "[2025-02-21 12:34:56] 1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,0,1,32.99,-106.97,10.5,1000.0,5";
+        let result = parse_telemetry(input, -90, 10.0).unwrap();
+        assert_eq!(result.accel_x, 1.0);
+        assert_eq!(result.gps_lat, 32.99);
+        assert_eq!(result.rssi, -90);
+        assert_eq!(result.snr, 10.0);
+    }
+
+    #[test]
+    fn test_parse_telemetry_invalid_format() {
+        let input = "bad data";
+        let result = parse_telemetry(input, -90, 10.0);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_convert_to_packet() {
+        let data = TelemetryData {
+            timestamp: "2025-02-21T12:34:56Z".to_string(),
+            accel_x: 1.0, accel_y: 2.0, accel_z: 3.0,
+            gyro_x: 4.0, gyro_y: 5.0, gyro_z: 6.0,
+            imu_temp: 7.0, bme_temp: 8.0, bme_pressure: 9.0,
+            bme_altitude: 10.0, bme_humidity: 11.0,
+            gps_fix: 0, gps_fix_quality: 1,
+            gps_lat: 32.99, gps_lon: -106.97, gps_speed: 10.5,
+            gps_altitude: 1000.0, gps_satellites: 5,
+            rssi: -90, snr: 10.0,
+        };
+        let packet = convert_to_packet(&data, 1);
+        assert_eq!(packet.id, 1);
+        assert_eq!(packet.mission_time, "45296");
+        assert!((packet.latitude - 32.99).abs() < 0.0001);
+        assert_eq!(packet.altitude, 1000.0);
+    }
 }
