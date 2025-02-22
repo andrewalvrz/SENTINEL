@@ -1,0 +1,38 @@
+[package]
+name = "tauri-plugin-serialplugin"
+version = "2.9.0"
+description = "Access the current process of your Tauri application."
+edition = "2021"
+authors = ["Tauri Programme within The Commons Conservancy"]
+license = "Apache-2.0 OR MIT"
+rust-version = "1.70"
+links = "tauri-plugin-serialplugin"
+repository = "https://github.com/s00d/tauri-plugin-serialplugin"
+
+[package.metadata.docs.rs]
+rustc-args = [ "--cfg", "docsrs" ]
+rustdoc-args = [ "--cfg", "docsrs" ]
+targets = ["x86_64-linux-android"]
+
+[package.metadata.platforms.support]
+windows = { level = "full", notes = "" }
+linux = { level = "full", notes = "" }
+macos = { level = "full", notes = "" }
+android = { level = "full", notes = "" }
+
+[build-dependencies]
+tauri-plugin = { version = "2.0.4", features = [ "build" ] }
+
+[dependencies]
+serialport = "4.7.0"
+tauri = "2.2.5"
+serde = { version = "1.0.217", features = ["derive"] }
+thiserror = "2.0.11"
+serde_json = "1.0.137"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+incremental = false
+opt-level = "s"

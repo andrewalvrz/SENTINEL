@@ -24,7 +24,7 @@
     "recharts": "^2.15.0",
     "swapy": "^1.0.3",
     "tailwind-merge": "^2.6.0",
-    "tauri-plugin-serialplugin": "^2.9.0",
+    "tauri-plugin-serialplugin": "github:s00d/tauri-plugin-serialplugin#main",
     "three": "^0.172.0"
   },
   "devDependencies": {
