@@ -3311,7 +3311,6 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "serialport",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
@@ -3934,8 +3933,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-serialplugin"
 version = "2.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1b21c7290e84f69bc5be3a6128176d08540878a914e04bc6ec4e20446637efb"
+source = "git+https://github.com/s00d/tauri-plugin-serialplugin.git?branch=main#0a3b9683c84fbf56e61997337494441960ad4258"
 dependencies = [
  "serde",
  "serde_json",
