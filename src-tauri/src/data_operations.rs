@@ -226,3 +226,134 @@ pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, Seri
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    // Test combining multiple cases for parsing telemetry messages
+    #[test]
+    fn test_parse_telemetry_combined() {
+        let test_cases = vec![
+            (
+                "[timestamp:1832944,acc_x:-8.40,acc_y:1.50,acc_z:6.10,gyro_x:-19.30,gyro_y:91.70,gyro_z:1.60,mag_x:5.20,mag_y:-21.70,mag_z:34.30,baro_press:966.23,press:993.64,gps_lat:37.784698,gps_lon:-122.409698,temp:22.80]",
+                -60,
+                10.0,
+                TelemetryData {
+                    timestamp: 1832944,
+                    acc_x: -8.40,
+                    acc_y: 1.50,
+                    acc_z: 6.10,
+                    gyro_x: -19.30,
+                    gyro_y: 91.70,
+                    gyro_z: 1.60,
+                    mag_x: 5.20,
+                    mag_y: -21.70,
+                    mag_z: 34.30,
+                    baro_press: 966.23,
+                    press: 993.64,
+                    gps_lat: 37.784698,
+                    gps_lon: -122.409698,
+                    temp: 22.80,
+                    rssi: -60,
+                    snr: 10.0,
+                }
+            ),
+            (
+                "[timestamp:987654,acc_x:1.23,acc_y:2.34,acc_z:3.45,gyro_x:4.56,gyro_y:5.67,gyro_z:6.78,mag_x:7.89,mag_y:8.90,mag_z:9.01,baro_press:1011.12,press:1112.13,gps_lat:13.14,gps_lon:14.15,temp:15.16]",
+                -50,
+                12.0,
+                TelemetryData {
+                    timestamp: 987654,
+                    acc_x: 1.23,
+                    acc_y: 2.34,
+                    acc_z: 3.45,
+                    gyro_x: 4.56,
+                    gyro_y: 5.67,
+                    gyro_z: 6.78,
+                    mag_x: 7.89,
+                    mag_y: 8.90,
+                    mag_z: 9.01,
+                    baro_press: 1011.12,
+                    press: 1112.13,
+                    gps_lat: 13.14,
+                    gps_lon: 14.15,
+                    temp: 15.16,
+                    rssi: -50,
+                    snr: 12.0,
+                }
+            ),
+        ];
+    
+        for (message, rssi, snr, expected) in test_cases {
+            let parsed = parse_telemetry(message, rssi, snr)
+                .expect("Failed to parse telemetry message");
+    
+            assert_eq!(parsed.timestamp, expected.timestamp);
+            assert!((parsed.acc_x - expected.acc_x).abs() < f32::EPSILON);
+            assert!((parsed.acc_y - expected.acc_y).abs() < f32::EPSILON);
+            assert!((parsed.acc_z - expected.acc_z).abs() < f32::EPSILON);
+            assert!((parsed.gyro_x - expected.gyro_x).abs() < f32::EPSILON);
+            assert!((parsed.gyro_y - expected.gyro_y).abs() < f32::EPSILON);
+            assert!((parsed.gyro_z - expected.gyro_z).abs() < f32::EPSILON);
+            assert!((parsed.mag_x - expected.mag_x).abs() < f32::EPSILON);
+            assert!((parsed.mag_y - expected.mag_y).abs() < f32::EPSILON);
+            assert!((parsed.mag_z - expected.mag_z).abs() < f32::EPSILON);
+            assert!((parsed.baro_press - expected.baro_press).abs() < f32::EPSILON);
+            assert!((parsed.press - expected.press).abs() < f32::EPSILON);
+            assert!((parsed.gps_lat - expected.gps_lat).abs() < f32::EPSILON);
+            assert!((parsed.gps_lon - expected.gps_lon).abs() < f32::EPSILON);
+            assert!((parsed.temp - expected.temp).abs() < f32::EPSILON);
+            assert_eq!(parsed.rssi, expected.rssi);
+            assert_eq!(parsed.snr, expected.snr);
+        }
+    }
+    
+    // Test that conversion from TelemetryData to TelemetryPacket is correct
+    #[test]
+    fn test_convert_to_packet() {
+        let data = TelemetryData {
+            timestamp: 123456,
+            acc_x: 1.0,
+            acc_y: 2.0,
+            acc_z: 3.0,
+            gyro_x: 4.0,
+            gyro_y: 5.0,
+            gyro_z: 6.0,
+            mag_x: 7.0,
+            mag_y: 8.0,
+            mag_z: 9.0,
+            baro_press: 10.0,
+            press: 11.0,
+            gps_lat: 12.0,
+            gps_lon: 13.0,
+            temp: 14.0,
+            rssi: -60,
+            snr: 10.0,
+        };
+    
+        let packet_id = 1;
+        let packet = convert_to_packet(&data, packet_id);
+    
+        assert_eq!(packet.id, packet_id);
+        assert_eq!(packet.mission_time, "123");
+        assert_eq!(packet.connected, true);
+        assert_eq!(packet.satellites, 0);
+        assert_eq!(packet.rssi, -60);
+        assert_eq!(packet.battery, 100.0);
+        assert_eq!(packet.latitude, 12.0);
+        assert_eq!(packet.longitude, 13.0);
+        assert_eq!(packet.altitude, 0.0);
+        assert_eq!(packet.velocity_x, 4.0);
+        assert_eq!(packet.velocity_y, 5.0);
+        assert_eq!(packet.velocity_z, 6.0);
+        assert_eq!(packet.acceleration_x, 1.0);
+        assert_eq!(packet.acceleration_y, 2.0);
+        assert_eq!(packet.acceleration_z, 3.0);
+        assert_eq!(packet.pitch, 4.0);
+        assert_eq!(packet.yaw, 5.0);
+        assert_eq!(packet.roll, 6.0);
+        assert_eq!(packet.minute, 2);
+        assert_eq!(packet.second, 3);
+    }
+}
