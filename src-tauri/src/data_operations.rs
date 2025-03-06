@@ -10,21 +10,31 @@ use crate::serial_operations::SerialConnection;
 /// Basic telemetry structure parsed from raw messages
 #[derive(Debug, Serialize, Clone)]
 pub struct TelemetryData {
-    pub timestamp: u64,
-    pub acc_x: f32,
-    pub acc_y: f32,
-    pub acc_z: f32,
-    pub gyro_x: f32,
-    pub gyro_y: f32,
-    pub gyro_z: f32,
+    pub id: u32,
+    pub mission_time: String,
+    pub connected: bool,
+    pub acceleration_x: f32,
+    pub acceleration_y: f32,
+    pub acceleration_z: f32,
+    pub velocity_x: f32,
+    pub velocity_y: f32,
+    pub velocity_z: f32,
+    pub pitch: f32,
+    pub roll: f32,
+    pub yaw: f32,
     pub mag_x: f32,
     pub mag_y: f32,
     pub mag_z: f32,
     pub baro_press: f32,
+    pub altitude: f32,
     pub press: f32,
-    pub gps_lat: f32,
-    pub gps_lon: f32,
+    pub latitude: f32,
+    pub longitude: f32,
+    pub satellites: u8,
     pub temp: f32,
+    pub battery: f32,
+    pub minute: u32,
+    pub second: u32,
     pub rssi: i32,
     pub snr: f32,
 }
@@ -55,36 +65,58 @@ pub struct TelemetryPacket {
 }
 
 /// Parse a single, complete telemetry message into our `TelemetryData` struct.
-fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> {
+fn parse_telemetry(raw_message: &str) -> Option<TelemetryData> {
+    // Split by ],rssi: to separate message and RSSI
+    let parts: Vec<&str> = raw_message.split("],rssi:").collect();
+    let message = parts.get(0)?;
+    
+    // Extract RSSI value if present, otherwise use a default
+    let rssi = if parts.len() > 1 && !parts[1].trim().is_empty() {
+        parts[1].trim().parse().unwrap_or(-100)
+    } else {
+        -100 // Default RSSI when not available
+    };
+
     // Check if message has the expected format
-    if !message.starts_with('[') || !message.ends_with(']') {
+    if !message.starts_with('[') {
         return None;
     }
     
     // Extract the content between brackets
-    let content = &message[1..message.len()-1];
+    let content = &message[1..];
     
-    // Parse key-value pairs
+    // Initialize data structure
     let mut data = TelemetryData {
-        timestamp: 0,
-        acc_x: 0.0,
-        acc_y: 0.0,
-        acc_z: 0.0,
-        gyro_x: 0.0,
-        gyro_y: 0.0,
-        gyro_z: 0.0,
+        id: 0,
+        mission_time: String::new(),
+        connected: false,
+        acceleration_x: 0.0,
+        acceleration_y: 0.0,
+        acceleration_z: 0.0,
+        velocity_x: 0.0,
+        velocity_y: 0.0,
+        velocity_z: 0.0,
+        pitch: 0.0,
+        roll: 0.0,
+        yaw: 0.0,
         mag_x: 0.0,
         mag_y: 0.0,
         mag_z: 0.0,
         baro_press: 0.0,
+        altitude: 0.0,
         press: 0.0,
-        gps_lat: 0.0,
-        gps_lon: 0.0,
+        latitude: 0.0,
+        longitude: 0.0,
+        satellites: 0,
         temp: 0.0,
+        battery: 0.0,
+        minute: 0,
+        second: 0,
         rssi,
-        snr,
+        snr: 0.0, // Default SNR since it's not in the new format
     };
     
+    // Parse key-value pairs
     for pair in content.split(',') {
         let parts: Vec<&str> = pair.split(':').collect();
         if parts.len() != 2 {
@@ -95,21 +127,31 @@ fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> 
         let value = parts[1].trim();
         
         match key {
-            "timestamp" => if let Ok(val) = value.parse() { data.timestamp = val },
-            "acc_x" => if let Ok(val) = value.parse() { data.acc_x = val },
-            "acc_y" => if let Ok(val) = value.parse() { data.acc_y = val },
-            "acc_z" => if let Ok(val) = value.parse() { data.acc_z = val },
-            "gyro_x" => if let Ok(val) = value.parse() { data.gyro_x = val },
-            "gyro_y" => if let Ok(val) = value.parse() { data.gyro_y = val },
-            "gyro_z" => if let Ok(val) = value.parse() { data.gyro_z = val },
+            "id" => if let Ok(val) = value.parse() { data.id = val },
+            "mission_time" => data.mission_time = value.to_string(),
+            "connected" => if let Ok(val) = value.parse::<u8>() { data.connected = val > 0 },
+            "acceleration_x" => if let Ok(val) = value.parse() { data.acceleration_x = val },
+            "acceleration_y" => if let Ok(val) = value.parse() { data.acceleration_y = val },
+            "acceleration_z" => if let Ok(val) = value.parse() { data.acceleration_z = val },
+            "velocity_x" => if let Ok(val) = value.parse() { data.velocity_x = val },
+            "velocity_y" => if let Ok(val) = value.parse() { data.velocity_y = val },
+            "velocity_z" => if let Ok(val) = value.parse() { data.velocity_z = val },
+            "pitch" => if let Ok(val) = value.parse() { data.pitch = val },
+            "roll" => if let Ok(val) = value.parse() { data.roll = val },
+            "yaw" => if let Ok(val) = value.parse() { data.yaw = val },
             "mag_x" => if let Ok(val) = value.parse() { data.mag_x = val },
             "mag_y" => if let Ok(val) = value.parse() { data.mag_y = val },
             "mag_z" => if let Ok(val) = value.parse() { data.mag_z = val },
             "baro_press" => if let Ok(val) = value.parse() { data.baro_press = val },
+            "altitude" => if let Ok(val) = value.parse() { data.altitude = val },
             "press" => if let Ok(val) = value.parse() { data.press = val },
-            "gps_lat" => if let Ok(val) = value.parse() { data.gps_lat = val },
-            "gps_lon" => if let Ok(val) = value.parse() { data.gps_lon = val },
+            "latitude" => if let Ok(val) = value.parse() { data.latitude = val },
+            "longitude" => if let Ok(val) = value.parse() { data.longitude = val },
+            "satellites" => if let Ok(val) = value.parse() { data.satellites = val },
             "temp" => if let Ok(val) = value.parse() { data.temp = val },
+            "battery" => if let Ok(val) = value.parse() { data.battery = val },
+            "minute" => if let Ok(val) = value.parse() { data.minute = val },
+            "second" => if let Ok(val) = value.parse() { data.second = val },
             _ => {}
         }
     }
@@ -119,32 +161,27 @@ fn parse_telemetry(message: &str, rssi: i32, snr: f32) -> Option<TelemetryData> 
 
 /// Convert raw `TelemetryData` into the final `TelemetryPacket` structure.
 fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
-    // Convert timestamp (milliseconds since start) to minutes and seconds
-    let total_seconds = data.timestamp / 1000;
-    let minutes = (total_seconds / 60) as u32;
-    let seconds = (total_seconds % 60) as u32;
-
     TelemetryPacket {
         id: packet_id,
-        mission_time: total_seconds.to_string(),
-        connected: true,
-        satellites: 0, // No satellites data in new format
+        mission_time: data.mission_time.clone(),
+        connected: data.connected,
+        satellites: data.satellites,
         rssi: data.rssi,
-        battery: 100.0, // placeholder battery value
-        latitude: data.gps_lat as f64,
-        longitude: data.gps_lon as f64,
-        altitude: 0.0, // No altitude data in new format
-        velocity_x: data.gyro_x,
-        velocity_y: data.gyro_y,
-        velocity_z: data.gyro_z,
-        acceleration_x: data.acc_x,
-        acceleration_y: data.acc_y,
-        acceleration_z: data.acc_z,
-        pitch: data.gyro_x,
-        yaw: data.gyro_y,
-        roll: data.gyro_z,
-        minute: minutes,
-        second: seconds,
+        battery: data.battery,
+        latitude: data.latitude as f64,
+        longitude: data.longitude as f64,
+        altitude: data.altitude,
+        velocity_x: data.velocity_x,
+        velocity_y: data.velocity_y,
+        velocity_z: data.velocity_z,
+        acceleration_x: data.acceleration_x,
+        acceleration_y: data.acceleration_y,
+        acceleration_z: data.acceleration_z,
+        pitch: data.pitch,
+        yaw: data.yaw,
+        roll: data.roll,
+        minute: data.minute,
+        second: data.second,
     }
 }
 
@@ -167,10 +204,6 @@ pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, Seri
     thread::spawn(move || {
         let mut serial_buf = vec![0u8; 1024];
         let mut accumulated_data = String::new();
-        
-        // Default RSSI and SNR values if not provided separately
-        let default_rssi = -60;
-        let default_snr = 10.0;
 
         loop {
             // Check if we've been asked to stop
@@ -183,13 +216,24 @@ pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, Seri
                 Ok(n) if n > 0 => {
                     accumulated_data.push_str(&String::from_utf8_lossy(&serial_buf[..n]));
 
-                    // Process complete messages enclosed in brackets
+                    // Process complete messages that end with rssi value or just ]
                     while let Some(start) = accumulated_data.find('[') {
-                        if let Some(end) = accumulated_data[start..].find(']') {
-                            let message = &accumulated_data[start..start+end+1];
+                        // First check if complete message with RSSI
+                        if let Some(end) = accumulated_data[start..].find("],rssi:") {
+                            // Find the end of the RSSI value (newline or next [)
+                            let mut rssi_end = accumulated_data[start + end + 7..].find('\n')
+                                .map(|pos| start + end + 7 + pos)
+                                .unwrap_or_else(|| accumulated_data.len());
                             
-                            // Parse the telemetry data directly from the complete message
-                            if let Some(parsed) = parse_telemetry(message, default_rssi, default_snr) {
+                            // Check if there's another [ before the newline
+                            if let Some(next_start) = accumulated_data[start + end + 7..rssi_end].find('[') {
+                                rssi_end = start + end + 7 + next_start;
+                            }
+                            
+                            let full_message = &accumulated_data[start..rssi_end];
+                            
+                            // Parse the telemetry data
+                            if let Some(parsed) = parse_telemetry(full_message) {
                                 let mut count = packet_counter.lock().unwrap();
                                 *count += 1;
                                 let packet = convert_to_packet(&parsed, *count);
@@ -200,7 +244,30 @@ pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, Seri
                             }
                             
                             // Remove the processed message
-                            accumulated_data = accumulated_data[start+end+1..].to_string();
+                            accumulated_data = accumulated_data[rssi_end..].to_string();
+                        }
+                        // Check if message ends with just ]
+                        else if let Some(end) = accumulated_data[start..].find(']') {
+                            if end > 0 {
+                                let full_message = &accumulated_data[start..start+end+1];
+                                
+                                // Parse the telemetry data (with no RSSI)
+                                if let Some(parsed) = parse_telemetry(full_message) {
+                                    let mut count = packet_counter.lock().unwrap();
+                                    *count += 1;
+                                    let packet = convert_to_packet(&parsed, *count);
+
+                                    // Emit events
+                                    let _ = app_handle.emit("telemetry-packet", packet.clone());
+                                    let _ = app_handle.emit("telemetry-update", packet);
+                                }
+                                
+                                // Remove the processed message
+                                accumulated_data = accumulated_data[start+end+1..].to_string();
+                            } else {
+                                // Incomplete message, wait for more data
+                                break;
+                            }
                         } else {
                             // Incomplete message, wait for more data
                             break;
