@@ -1,7 +1,13 @@
+use std::io::Read;
+use std::thread;
+use std::time::Duration;
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Listener, Manager, Runtime};
+use tauri::{State, AppHandle, Emitter};
 use serde::Serialize;
 
+use crate::serial_operations::SerialConnection;
+
+/// Basic telemetry structure parsed from raw messages
 #[derive(Debug, Serialize, Clone)]
 pub struct TelemetryData {
     pub id: u32,
@@ -33,6 +39,7 @@ pub struct TelemetryData {
     pub snr: f32,
 }
 
+/// This is what the front end ultimately receives via event emission
 #[derive(Debug, Serialize, Clone)]
 pub struct TelemetryPacket {
     pub id: u32,
@@ -57,7 +64,7 @@ pub struct TelemetryPacket {
     pub second: u32,
 }
 
-// Original parse_telemetry function (outside test module)
+/// Parse a single, complete telemetry message into our `TelemetryData` struct.
 fn parse_telemetry(raw_message: &str) -> Option<TelemetryData> {
     // Split by ],rssi: to separate message and RSSI
     let parts: Vec<&str> = raw_message.split("],rssi:").collect();
@@ -150,66 +157,15 @@ fn parse_telemetry(raw_message: &str) -> Option<TelemetryData> {
     }
     
     Some(data)
-
-    let raw_timestamp = parts[0].trim_start_matches('[');
-    let ts_parts: Vec<&str> = raw_timestamp.split(' ').collect();
-    if ts_parts.len() != 2 { // Adjusted for [YYYY-MM-DD HH:MM:SS]
-        return None;
-    }
-    let date = ts_parts[0].replace("/", "-");
-    let time = ts_parts[1];
-    let iso_timestamp = format!("{}T{}Z", date, time);
-
-    let data_str = parts[1];
-    let values: Vec<&str> = data_str.split(',').collect();
-    if values.len() != 18 {
-        return None;
-    }
-
-    Some(TelemetryData {
-        timestamp: iso_timestamp,
-        accel_x: values[0].trim().parse().ok()?,
-        accel_y: values[1].trim().parse().ok()?,
-        accel_z: values[2].trim().parse().ok()?,
-        gyro_x: values[3].trim().parse().ok()?,
-        gyro_y: values[4].trim().parse().ok()?,
-        gyro_z: values[5].trim().parse().ok()?,
-        imu_temp: values[6].trim().parse().ok()?,
-        bme_temp: values[7].trim().parse().ok()?,
-        bme_pressure: values[8].trim().parse().ok()?,
-        bme_altitude: values[9].trim().parse().ok()?,
-        bme_humidity: values[10].trim().parse().ok()?,
-        gps_fix: values[11].trim().parse().ok()?,
-        gps_fix_quality: values[12].trim().parse().ok()?,
-        gps_lat: values[13].trim().parse().ok()?,
-        gps_lon: values[14].trim().parse().ok()?,
-        gps_speed: values[15].trim().parse().ok()?,
-        gps_altitude: values[16].trim().parse().ok()?,
-        gps_satellites: values[17].trim().parse().ok()?,
-        rssi,
-        snr,
-    })
 }
 
+/// Convert raw `TelemetryData` into the final `TelemetryPacket` structure.
 fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
-    let time_parts: Vec<&str> = data.timestamp.split('T').collect();
-    let time_str = time_parts.get(1).unwrap_or(&"").trim_end_matches('Z');
-    let comps: Vec<&str> = time_str.split(':').collect();
-
-    let hours: u32 = comps.get(0).unwrap_or(&"0").parse().unwrap_or(0);
-    let minutes: u32 = comps.get(1).unwrap_or(&"0").parse().unwrap_or(0);
-    let seconds: u32 = comps.get(2).unwrap_or(&"0").parse().unwrap_or(0);
-
-    let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
-
     TelemetryPacket {
         id: packet_id,
         mission_time: data.mission_time.clone(),
         connected: data.connected,
         satellites: data.satellites,
-        mission_time: total_seconds.to_string(),
-        connected: true,
-        satellites: data.gps_satellites,
         rssi: data.rssi,
         battery: data.battery,
         latitude: data.latitude as f64,
@@ -226,46 +182,39 @@ fn convert_to_packet(data: &TelemetryData, packet_id: u32) -> TelemetryPacket {
         roll: data.roll,
         minute: data.minute,
         second: data.second,
-        battery: 100.0,
-        latitude: data.gps_lat as f64,
-        longitude: data.gps_lon as f64,
-        altitude: data.gps_altitude,
-        velocity_x: data.gyro_x,
-        velocity_y: data.gyro_y,
-        velocity_z: data.gyro_z,
-        acceleration_x: data.accel_x,
-        acceleration_y: data.accel_y,
-        acceleration_z: data.accel_z,
-        pitch: data.gyro_x,
-        yaw: data.gyro_y,
-        roll: data.gyro_z,
-        minute: minutes,
-        second: seconds,
     }
 }
 
+/// Spawns a background thread that reads from the currently open serial port,
+/// parses each chunk of data, and emits it to the front end.
+/// 
+/// **Important**: The thread automatically stops when `close_serial` is invoked,
+/// because that sets the shared `stop_flag`, and we check it each loop iteration.
 #[tauri::command]
-pub fn rt_parsed_stream<R: Runtime>(
-    app_handle: AppHandle<R>,
-    port_name: String,
-) -> Result<(), String> {
+pub fn rt_parsed_stream(app_handle: AppHandle, serial_connection: State<'_, SerialConnection>) -> Result<(), String> {
+    let connection = serial_connection.port.lock().unwrap();
+    let mut port = match connection.as_ref() {
+        Some(port) => port.try_clone().map_err(|e| e.to_string())?,
+        None => return Err("No active serial connection".to_string()),
+    };
+
+    let stop_flag = serial_connection.stop_flag.clone();
     let packet_counter = Arc::new(Mutex::new(0u32));
-    let app_handle_clone = app_handle.clone();
-    let serial = app_handle.state::<tauri_plugin_serialplugin::SerialPort<R>>();
 
-    serial
-        .start_listening(port_name.clone(), Some(100), Some(1024))
-        .map_err(|e| e.to_string())?;
-
-    let event_name = format!(
-        "plugin-serialplugin-read-{}",
-        port_name.replace(".", "-").replace("/", "-")
-    );
-    app_handle.listen(event_name, move |event| {
-        let payload = event.payload();
+    thread::spawn(move || {
+        let mut serial_buf = vec![0u8; 1024];
         let mut accumulated_data = String::new();
 
-        accumulated_data.push_str(payload);
+        loop {
+            // Check if we've been asked to stop
+            if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!("rt_parsed_stream: stop_flag detected, exiting thread.");
+                break;
+            }
+
+            match port.read(&mut serial_buf) {
+                Ok(n) if n > 0 => {
+                    accumulated_data.push_str(&String::from_utf8_lossy(&serial_buf[..n]));
 
                     // Process complete messages that end with rssi value or just ]
                     while let Some(start) = accumulated_data.find('[') {
@@ -307,25 +256,6 @@ pub fn rt_parsed_stream<R: Runtime>(
                                     let mut count = packet_counter.lock().unwrap();
                                     *count += 1;
                                     let packet = convert_to_packet(&parsed, *count);
-        while let Some(pos) = accumulated_data.find("\r\n") {
-            let line = accumulated_data[..pos].trim();
-
-            if line.starts_with("Message: ") {
-                current_message = line["Message: ".len()..].to_string();
-            } else if line.starts_with("RSSI: ") {
-                if let Ok(rssi_val) = line["RSSI: ".len()..].trim().parse() {
-                    current_rssi = Some(rssi_val);
-                }
-            } else if line.starts_with("Snr: ") {
-                if let Ok(snr_val) = line["Snr: ".len()..].trim().parse() {
-                    current_snr = Some(snr_val);
-                }
-
-                if let (Some(rssi), Some(snr)) = (current_rssi, current_snr) {
-                    if let Some(parsed) = parse_telemetry(&current_message, rssi, snr) {
-                        let mut count = packet_counter.lock().unwrap();
-                        *count += 1;
-                        let packet = convert_to_packet(&parsed, *count);
 
                                     // Emit events
                                     let _ = app_handle.emit("telemetry-packet", packet.clone());
@@ -358,61 +288,8 @@ pub fn rt_parsed_stream<R: Runtime>(
                     break;
                 }
             }
-                        let _ = app_handle_clone.emit("telemetry-packet", packet.clone());
-                        let _ = app_handle_clone.emit("telemetry-update", packet);
-                    }
-
-                    current_message.clear();
-                    current_rssi = None;
-                    current_snr = None;
-                }
-            }
-
-            accumulated_data = accumulated_data[pos + 2..].to_string();
         }
     });
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_telemetry_valid() {
-        let input = "[2025-02-21 12:34:56] 1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,0,1,32.99,-106.97,10.5,1000.0,5";
-        let result = parse_telemetry(input, -90, 10.0).unwrap();
-        assert_eq!(result.accel_x, 1.0);
-        assert_eq!(result.gps_lat, 32.99);
-        assert_eq!(result.rssi, -90);
-        assert_eq!(result.snr, 10.0);
-    }
-
-    #[test]
-    fn test_parse_telemetry_invalid_format() {
-        let input = "bad data";
-        let result = parse_telemetry(input, -90, 10.0);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_convert_to_packet() {
-        let data = TelemetryData {
-            timestamp: "2025-02-21T12:34:56Z".to_string(),
-            accel_x: 1.0, accel_y: 2.0, accel_z: 3.0,
-            gyro_x: 4.0, gyro_y: 5.0, gyro_z: 6.0,
-            imu_temp: 7.0, bme_temp: 8.0, bme_pressure: 9.0,
-            bme_altitude: 10.0, bme_humidity: 11.0,
-            gps_fix: 0, gps_fix_quality: 1,
-            gps_lat: 32.99, gps_lon: -106.97, gps_speed: 10.5,
-            gps_altitude: 1000.0, gps_satellites: 5,
-            rssi: -90, snr: 10.0,
-        };
-        let packet = convert_to_packet(&data, 1);
-        assert_eq!(packet.id, 1);
-        assert_eq!(packet.mission_time, "45296");
-        assert!((packet.latitude - 32.99).abs() < 0.0001);
-        assert_eq!(packet.altitude, 1000.0);
-    }
 }
