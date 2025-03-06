@@ -1,34 +1,89 @@
-use tauri::{AppHandle, Manager, Runtime};
+use serialport::SerialPort;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+use tauri::State;
 
-#[tauri::command]
-pub fn list_serial_ports<R: Runtime>(app_handle: AppHandle<R>) -> Result<Vec<String>, String> {
-    let serial = app_handle.state::<tauri_plugin_serialplugin::SerialPort<R>>();
-    serial
-        .available_ports()
-        .map(|ports| ports.keys().cloned().collect())
-        .map_err(|e| e.to_string())
+/// Holds the serial port plus a stop flag for any spawned threads.
+pub struct SerialConnection {
+    /// The actual serial port, if open
+    pub port: Mutex<Option<Box<dyn SerialPort + Send>>>,
+    /// A flag to indicate the parsing thread should stop
+    pub stop_flag: Arc<AtomicBool>,
 }
 
+impl SerialConnection {
+    /// Create a new `SerialConnection` with no open port and `stop_flag=false`
+    pub fn new() -> Self {
+        Self {
+            port: Mutex::new(None),
+            stop_flag: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+/// Lists all available serial ports on the system
 #[tauri::command]
-pub async fn open_serial<R: Runtime>(
+pub fn list_serial_ports() -> Result<Vec<String>, String> {
+    match serialport::available_ports() {
+        Ok(ports) => Ok(ports.iter().map(|p| p.port_name.clone()).collect()),
+        Err(e) => Err(format!("Failed to list ports: {}", e)),
+    }
+}
+
+/// Opens a new serial connection at the specified port/baud rate
+#[tauri::command]
+pub async fn open_serial(
     port_name: String,
     baud_rate: u32,
-    app_handle: AppHandle<R>,
+    serial_connection: State<'_, SerialConnection>,
 ) -> Result<String, String> {
-    let serial = app_handle.state::<tauri_plugin_serialplugin::SerialPort<R>>();
-    serial
-        .open(port_name.clone(), baud_rate, None, None, None, None, None)
-        .map_err(|e| e.to_string())?;
-    Ok(format!("Connected to {} at {} baud", port_name, baud_rate))
+    // 1) Reset the stop flag in case it was set by a previous `close_serial`.
+    serial_connection
+        .stop_flag
+        .store(false, Ordering::Relaxed);
+
+    // 2) Check if there's already an open connection
+    let mut connection = serial_connection.port.lock().unwrap();
+    if connection.is_some() {
+        return Err("A serial connection is already open".to_string());
+    }
+
+    // 3) Attempt to open the port
+    match serialport::new(&port_name, baud_rate)
+        .timeout(Duration::from_millis(0)) // No timeout for continuous streaming
+        .open()
+    {
+        Ok(port) => {
+            *connection = Some(port);
+            let message = format!("Connected to {} at {} baud", port_name, baud_rate);
+            println!("{}", message); // Debug print statement
+            Ok(message)
+        }
+        Err(e) => Err(format!("Failed to connect: {}", e)),
+    }
 }
 
+/// Closes the currently active serial connection and signals the parser thread to stop
 #[tauri::command]
-pub async fn close_serial<R: Runtime>(
-    app_handle: AppHandle<R>,
-    port_name: String,
+pub async fn close_serial(
+    serial_connection: State<'_, SerialConnection>,
 ) -> Result<String, String> {
-    let serial = app_handle.state::<tauri_plugin_serialplugin::SerialPort<R>>();
-    serial.close(port_name).map_err(|e| e.to_string())?;
+    {
+        let mut connection = serial_connection.port.lock().unwrap();
+        if connection.is_none() {
+            return Err("No active serial connection to close".to_string());
+        }
+
+        // 1) Set the stop flag so the parsing thread breaks out
+        serial_connection
+            .stop_flag
+            .store(true, Ordering::Relaxed);
+
+        // 2) Drop the actual port handle
+        *connection = None;
+    }
+
     Ok("Serial port closed successfully".to_string())
 }
 
