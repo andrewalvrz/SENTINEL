@@ -1,6 +1,8 @@
 mod data_operations;
 mod file_operations;
-mod serial_operations;
+
+use serial_operations::SerialConnection; // Updated import
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,6 +13,7 @@ pub fn run() {
             serial_operations::list_serial_ports,
             serial_operations::open_serial,
             serial_operations::close_serial,
+            serial_operations::write_serial,
             file_operations::create_text_file,
             file_operations::list_files,
             data_operations::rt_parsed_stream
