@@ -86,3 +86,17 @@ pub async fn close_serial(
 
     Ok("Serial port closed successfully".to_string())
 }
+
+#[tauri::command]
+pub async fn write_serial(state: State<'_, SerialConnection>, command: String) -> Result<(), String> {
+    let mut port_lock = state.port.lock().map_err(|_| "Mutex poisoned".to_string())?;
+    if let Some(ref mut port) = *port_lock {
+        port.write_all(command.as_bytes())
+            .map_err(|e| e.to_string())?;
+        port.flush()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    } else {
+        Err("Serial port not open".into())
+    }
+}

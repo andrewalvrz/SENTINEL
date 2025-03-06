@@ -1,7 +1,6 @@
 mod serial_operations;
 mod data_operations;
 mod file_operations;
-mod telemetry_sim;
 
 use serial_operations::SerialConnection; // Updated import
 
@@ -16,9 +15,9 @@ pub fn run() {
             serial_operations::list_serial_ports,
             serial_operations::open_serial,
             serial_operations::close_serial,
+            serial_operations::write_serial,
             file_operations::create_text_file,
             file_operations::list_files,
-            telemetry_sim::stream_telemetry,
             data_operations::rt_parsed_stream 
         ])
         .run(tauri::generate_context!())
