@@ -36,18 +36,36 @@ const MapInvalidator = forwardRef((props, ref) => {
     return null;
 });
 
+// Custom component for the map mode toggle
+const MapModeToggle = ({ mapMode, toggleMapMode }) => {
+    const map = useMap();
+    
+    return (
+        <div className="leaflet-top leaflet-right" style={{ zIndex: 1000, margin: '10px' }}>
+            <div className="leaflet-control leaflet-bar bg-white dark:bg-gray-800 rounded-md shadow-md">
+                <button 
+                    onClick={toggleMapMode} 
+                    className="p-2 flex items-center justify-center"
+                    title={mapMode === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                    {mapMode === 'dark' ? '☀️' : '🌙'}
+                </button>
+            </div>
+        </div>
+    );
+};
+
 function Map({ markers }) {
     const mapRef = useRef(null);
     const [zoomLevel, setZoomLevel] = useState(13);
     const [position, setPosition] = useState([32.9901482, -106.9750699, 947]);
     const [swaping, setSwaping] = useState(false);
     const [hasChanged, setHasChanged] = useState(false);
-
-    /*const markers = [
-        { id: 1, position: [32.9901482, -106.9750699, 947], popup: "Marker 1" },
-        { id: 2, position: [33.0901482, -107.9750699, 947], popup: "Marker 2" },
-        { id: 3, position: [31.9901482, -105.9750699, 947], popup: "Marker 3" },
-    ];*/
+    const [mapMode, setMapMode] = useState('dark'); // Add state for map mode
+    
+    const toggleMapMode = () => {
+        setMapMode(prev => prev === 'dark' ? 'light' : 'dark');
+    };
 
     useEffect(() => {
         const container = document.getElementById('main')
@@ -121,13 +139,17 @@ function Map({ markers }) {
                             <MapInvalidator ref={mapRef} setZoomLevel={setZoomLevel} setPosition={setPosition} />
                             <TileLayer
                                 attribution='&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
-                                url='https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
+                                url={mapMode === 'dark' 
+                                    ? 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
+                                    : 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png'
+                                }
                             />
                             {markers.map((marker) => (
                                 <Marker key={marker.id} position={marker.position}>
                                     <Popup>{marker.id}</Popup>
                                 </Marker>
                             ))}
+                            <MapModeToggle mapMode={mapMode} toggleMapMode={toggleMapMode} />
                         </MapContainer>
                     </div>
                 </div>
