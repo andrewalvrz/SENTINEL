@@ -1,11 +1,11 @@
-import React from 'react'
-import { cn } from "../utils"
-import { MapContainer } from 'react-leaflet/MapContainer'
-import { TileLayer } from 'react-leaflet/TileLayer'
-import { Marker, Popup } from 'react-leaflet'
-import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react"
-import { createSwapy } from 'swapy'
-import { useMap } from 'react-leaflet/hooks'
+import React from 'react';
+import { cn } from "../utils";
+import { MapContainer } from 'react-leaflet/MapContainer';
+import { TileLayer } from 'react-leaflet/TileLayer';
+import { Marker, Popup } from 'react-leaflet';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
+import { createSwapy } from 'swapy';
+import { useMap } from 'react-leaflet/hooks';
 import { useMapEvents } from "react-leaflet";
 
 const MapInvalidator = forwardRef((props, ref) => {
@@ -14,6 +14,8 @@ const MapInvalidator = forwardRef((props, ref) => {
     const mapEvents = useMapEvents({
         zoomend: () => {
             props.setZoomLevel(mapEvents.getZoom());
+            // Re-center the map after zooming
+            map.setView(props.center, mapEvents.getZoom());
         },
         moveend: () => {
             const center = mapEvents.getCenter();
@@ -22,11 +24,9 @@ const MapInvalidator = forwardRef((props, ref) => {
     });
 
     useImperativeHandle(ref, () => ({
-
         update() {
             map.invalidateSize();
         }
-
     }));
 
     useEffect(() => {
@@ -39,35 +39,35 @@ const MapInvalidator = forwardRef((props, ref) => {
 function Map({ markers }) {
     const mapRef = useRef(null);
     const [zoomLevel, setZoomLevel] = useState(13);
-    const [position, setPosition] = useState([32.9901482, -106.9750699, 947]);
+    const center = [33.501037, -99.338722]; // Fixed center point (your coordinates)
+    const [position, setPosition] = useState(center); // Initial position
     const [swaping, setSwaping] = useState(false);
     const [hasChanged, setHasChanged] = useState(false);
 
-    /*const markers = [
-        { id: 1, position: [32.9901482, -106.9750699, 947], popup: "Marker 1" },
-        { id: 2, position: [33.0901482, -107.9750699, 947], popup: "Marker 2" },
-        { id: 3, position: [31.9901482, -105.9750699, 947], popup: "Marker 3" },
-    ];*/
+    // Default marker at your coordinates
+    const defaultMarkers = [
+        { id: 1, position: center, popup: "Marker at 33°30'03.7\"N 99°20'19.4\"W" }
+    ];
 
     useEffect(() => {
-        const container = document.getElementById('main')
+        const container = document.getElementById('main');
 
         const swapy = createSwapy(container, {
             animation: 'dynamic',
             preserveAspectRatio: true
-        })
+        });
 
         swapy.onSwapEnd((event) => {
-            setSwaping(false)
-            mapRef.current.update()
-            setHasChanged(prev => !prev)
+            setSwaping(false);
+            mapRef.current.update();
+            setHasChanged(prev => !prev);
         });
 
         swapy.onSwapStart(() => {
-            setSwaping(true)
+            setSwaping(true);
         });
 
-        const style = document.createElement('style')
+        const style = document.createElement('style');
         style.innerHTML = `
           [data-swapy-item] {
             transition: none !important;
@@ -83,16 +83,16 @@ function Map({ markers }) {
             width: 100% !important;
             height: 100% !important;
           }
-        `
-        document.head.appendChild(style)
+        `;
+        document.head.appendChild(style);
 
-        swapy.enable(true)
+        swapy.enable(true);
 
         return () => {
-            swapy.enable(false)
-            style.remove()
-        }
-    }, [])
+            swapy.enable(false);
+            style.remove();
+        };
+    }, []);
 
     return (
         <div className="flex-1 min-w-0" data-swapy-slot="1">
@@ -111,21 +111,28 @@ function Map({ markers }) {
                         "hidden": swaping
                     })}>
                         <MapContainer
-                            center={position}
+                            center={center} // Initial center
                             zoom={zoomLevel}
                             scrollWheelZoom={true}
                             className="w-full h-full"
                             key={hasChanged}
-                            attributionControl={false} 
+                            attributionControl={false}
                         >
-                            <MapInvalidator ref={mapRef} setZoomLevel={setZoomLevel} setPosition={setPosition} />
-                            <TileLayer
-                                attribution='&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
-                                url='https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
+                            <MapInvalidator 
+                                ref={mapRef} 
+                                setZoomLevel={setZoomLevel} 
+                                setPosition={setPosition} 
+                                center={center} // Pass center to MapInvalidator
                             />
-                            {markers.map((marker) => (
+                            <TileLayer
+                                url="/tiles/{z}/{x}/{y}.png"
+                                minZoom={6}  // Your tile range
+                                maxZoom={18} // Your tile range
+                                attribution="Local Tiles"
+                            />
+                            {(markers || defaultMarkers).map((marker) => (
                                 <Marker key={marker.id} position={marker.position}>
-                                    <Popup>{marker.id}</Popup>
+                                    <Popup>{marker.popup}</Popup>
                                 </Marker>
                             ))}
                         </MapContainer>
@@ -133,7 +140,7 @@ function Map({ markers }) {
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
-export default Map
+export default Map;

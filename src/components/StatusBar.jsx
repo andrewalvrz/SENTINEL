@@ -1,20 +1,17 @@
-import React, { useState } from 'react'
+// src/components/StatusBar.jsx
+import React, { useState } from 'react';
 import { Satellite, BatteryFull, SignalHigh } from 'lucide-react';
 import { cn } from "../utils";
 
 function StatusBar({ missionTime, satellites, connected, RSSI, battery }) {
-    const [showConsoleOutput, setShowConsoleOutput] = useState(false);
+    const [showConsoleOutput] = useState(false);
 
     function secondsToHHMMSS(seconds) {
-        // Parse the input to number if it's a string
         const totalSeconds = typeof seconds === 'string' ? parseInt(seconds, 10) : seconds;
-        
         if (isNaN(totalSeconds)) return '00:00:00';
-        
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const secs = Math.floor(totalSeconds % 60);
-    
         return [
             hours.toString().padStart(2, '0'),
             minutes.toString().padStart(2, '0'),
@@ -23,23 +20,22 @@ function StatusBar({ missionTime, satellites, connected, RSSI, battery }) {
     }
 
     return (
-        <div className="w-full h-14 bg-[#09090B] flex flex-row items-center justify-between px-4 border-b-2 border-[#18181B]" data-tauri-drag-region>
-
+        <div className="w-full h-14 bg-gray-200 flex flex-row items-center justify-between px-4 border-b-2 border-gray-300 text-black" data-tauri-drag-region>
             <div className="flex flex-col items-center font-mono">
-                <p className="text-[#9CA3AF]">Mission Clock</p>
-                <p className="text-white">{secondsToHHMMSS(missionTime)}</p>
+                <p className="text-gray-500">Mission Clock</p>
+                <p>{secondsToHHMMSS(missionTime)}</p>
             </div>
 
             <div className="flex flex-col items-center font-mono">
-                <p className="text-[#9CA3AF]">Satellites</p>
-                <div className="text-white flex flex-row items-center gap-2">
+                <p className="text-gray-500">Satellites</p>
+                <div className="flex flex-row items-center gap-2">
                     <p>{satellites}</p>
                     <Satellite size={18} />
                 </div>
             </div>
 
             <div className="flex flex-col items-center font-mono">
-                <p className="text-[#9CA3AF]">Status</p>
+                <p className="text-gray-500">Status</p>
                 <p className={cn("font-semibold", {
                     "text-red-600": !connected,
                     "text-green-600": connected
@@ -47,22 +43,22 @@ function StatusBar({ missionTime, satellites, connected, RSSI, battery }) {
             </div>
 
             <div className="flex flex-col items-center font-mono">
-                <p className="text-[#9CA3AF]">Signal</p>
-                <div className="text-white flex flex-row items-center gap-2">
+                <p className="text-gray-500">Signal</p>
+                <div className="flex flex-row items-center gap-2">
                     <p>{Math.round(RSSI)} dBm</p>
                     <SignalHigh size={18} />
                 </div>
             </div>
 
             <div className="flex flex-col items-center font-mono">
-                <p className="text-[#9CA3AF]">Battery</p>
-                <div className="text-white flex flex-row items-center gap-2">
+                <p className="text-gray-500">Battery</p>
+                <div className="flex flex-row items-center gap-2">
                     <p>{Math.floor(battery)}%</p>
                     <BatteryFull size={18} />
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
-export default StatusBar
+export default StatusBar;

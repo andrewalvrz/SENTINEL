@@ -1,7 +1,8 @@
+// src/App.jsx
 import "./App.css";
 import StatusBar from "./components/StatusBar";
 import Sidebar from "./components/Sidebar";
-import 'leaflet/dist/leaflet.css'
+import 'leaflet/dist/leaflet.css';
 import FlightTrajectory from "./components/FlightTrajectory";
 import Graphs from "./components/Graphs";
 import Orientation from "./components/Orientation";
@@ -44,7 +45,6 @@ function App() {
     const unlisten = [];
 
     async function setupListeners() {
-      // Listen for telemetry packets
       unlisten.push(
         await listen('telemetry-packet', event => {
           setPackets(prev => [...prev, event.payload]);
@@ -54,13 +54,9 @@ function App() {
         })
       );
 
-      // Optional: Listen for connection status changes
       unlisten.push(
         await listen('serial-disconnected', () => {
           setIsRunning(false);
-          // Optionally clear or preserve existing data
-          // setPackets([]);
-          // setLatestPacket({});
         })
       );
     }
@@ -70,7 +66,7 @@ function App() {
   }, []);
 
   return (
-    <main id="main" className="w-screen h-screen bg-black flex flex-col">
+    <main id="main" className="w-screen h-screen bg-gray-100 flex flex-col text-black">
       <StatusBar
         missionTime={latestPacket.mission_time}
         satellites={latestPacket.satellites}
@@ -88,15 +84,12 @@ function App() {
                 position: [packet.latitude, packet.longitude]
               }))}
             />
-
             <Orientation
-              rotation={
-                {
-                  pitch: latestPacket.pitch,
-                  yaw: latestPacket.yaw,
-                  roll: latestPacket.roll
-                }
-              }
+              rotation={{
+                pitch: latestPacket.pitch,
+                yaw: latestPacket.yaw,
+                roll: latestPacket.roll
+              }}
             />
           </div>
 
@@ -110,7 +103,6 @@ function App() {
               packetRecieved={packetReceived}
               setPacketRecieved={setPacketReceived}
             />
-
             <Graphs
               velocity={packets.map(packet => ({
                 name: packet.id,
